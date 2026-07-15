@@ -1,0 +1,11 @@
+# Qt Creator / qmake 构建产物（已弃用，仅维护 VS）
+build/
+build-debug/
+build-release/
+.qtcreator/
+
+# VS / MSBuild
+x64/
+*.user
+*.suo
+*.sdf

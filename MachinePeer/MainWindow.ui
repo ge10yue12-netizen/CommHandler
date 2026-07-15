@@ -1,0 +1,428 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>880</width>
+    <height>700</height>
+   </rect>
+  </property>
+  <property name="windowTitle">
+   <string>MachinePeer — 试验机对端</string>
+  </property>
+  <widget class="QWidget" name="centralwidget">
+   <layout class="QVBoxLayout" name="rootLayout">
+    <item>
+     <widget class="QGroupBox" name="groupLink">
+      <property name="title">
+       <string>通道（试验机侧）</string>
+      </property>
+      <layout class="QVBoxLayout" name="linkLayout">
+       <item>
+        <layout class="QHBoxLayout" name="typeRow">
+         <item>
+          <widget class="QLabel" name="lblType">
+           <property name="text">
+            <string>类型</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="cmbCommType"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnOpen">
+           <property name="text">
+            <string>打开</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnClose">
+           <property name="text">
+            <string>关闭</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="typeSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QWidget" name="serialPanel">
+         <layout class="QVBoxLayout" name="serialLayout">
+          <property name="leftMargin">
+           <number>0</number>
+          </property>
+          <property name="topMargin">
+           <number>0</number>
+          </property>
+          <property name="rightMargin">
+           <number>0</number>
+          </property>
+          <property name="bottomMargin">
+           <number>0</number>
+          </property>
+          <item>
+           <layout class="QHBoxLayout" name="serialRowPort">
+            <item>
+             <widget class="QLabel" name="lblCom">
+              <property name="text">
+               <string>COM 序号</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spinComPort">
+              <property name="maximum">
+               <number>255</number>
+              </property>
+              <property name="value">
+               <number>4</number>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblComEcho">
+              <property name="text">
+               <string>COM5</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblSeg">
+              <property name="text">
+               <string>段长</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbSegSize"/>
+            </item>
+            <item>
+             <spacer name="serialSpacer1">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+          <item>
+           <layout class="QHBoxLayout" name="serialRowLine">
+            <item>
+             <widget class="QLabel" name="lblBaud">
+              <property name="text">
+               <string>波特率</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbBaud"/>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblDataBits">
+              <property name="text">
+               <string>数据位</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbDataBits"/>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblParity">
+              <property name="text">
+               <string>校验</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbParity"/>
+            </item>
+            <item>
+             <widget class="QLabel" name="lblStopBits">
+              <property name="text">
+               <string>停止位</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QComboBox" name="cmbStopBits"/>
+            </item>
+            <item>
+             <spacer name="serialSpacer2">
+              <property name="orientation">
+               <enum>Qt::Horizontal</enum>
+              </property>
+             </spacer>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
+        <widget class="QWidget" name="udpPanel">
+         <property name="visible">
+          <bool>false</bool>
+         </property>
+         <layout class="QFormLayout" name="udpForm">
+          <item row="0" column="0">
+           <widget class="QLabel" name="lblBind">
+            <property name="text">
+             <string>本机绑定</string>
+            </property>
+           </widget>
+          </item>
+          <item row="0" column="1">
+           <layout class="QHBoxLayout" name="bindRow">
+            <item>
+             <widget class="QLineEdit" name="editBindIp">
+              <property name="text">
+               <string>127.0.0.1</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spinBindPort">
+              <property name="minimum">
+               <number>1</number>
+              </property>
+              <property name="maximum">
+               <number>65535</number>
+              </property>
+              <property name="value">
+               <number>19106</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+          <item row="1" column="0">
+           <widget class="QLabel" name="lblPeer">
+            <property name="text">
+             <string>发往对端</string>
+            </property>
+           </widget>
+          </item>
+          <item row="1" column="1">
+           <layout class="QHBoxLayout" name="peerRow">
+            <item>
+             <widget class="QLineEdit" name="editPeerIp">
+              <property name="text">
+               <string>127.0.0.1</string>
+              </property>
+             </widget>
+            </item>
+            <item>
+             <widget class="QSpinBox" name="spinPeerPort">
+              <property name="minimum">
+               <number>1</number>
+              </property>
+              <property name="maximum">
+               <number>65535</number>
+              </property>
+              <property name="value">
+               <number>19105</number>
+              </property>
+             </widget>
+            </item>
+           </layout>
+          </item>
+         </layout>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupAction">
+      <property name="title">
+       <string>试验机动作（主：收指令执行；亦可回发测量）</string>
+      </property>
+      <layout class="QVBoxLayout" name="actionLayout">
+       <item>
+        <widget class="QCheckBox" name="chkAutoReply">
+         <property name="text">
+          <string>收到「开始计算」后执行并回发一组测量值</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="cmdRow">
+         <item>
+          <widget class="QLabel" name="lblCmd">
+           <property name="text">
+            <string>附加：主动发指令（双向测试）</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnCmdStart">
+           <property name="text">
+            <string>开始 3D0D</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnCmdStop">
+           <property name="text">
+            <string>停止 3E0D</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnCmdSave">
+           <property name="text">
+            <string>存图 6B0D</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnCmdZero">
+           <property name="text">
+            <string>清零 5A0D</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="cmdSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="valueRow">
+         <item>
+          <widget class="QLabel" name="lblForce">
+           <property name="text">
+            <string>力</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="editForce">
+           <property name="text">
+            <string>100.5</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lblMove">
+           <property name="text">
+            <string>位移</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="editMove">
+           <property name="text">
+            <string>1.0</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lblStrain">
+           <property name="text">
+            <string>应变</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="editStrain">
+           <property name="text">
+            <string>0.5</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnSendMeasure">
+           <property name="text">
+            <string>发送测量值</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnSelfTest">
+           <property name="text">
+            <string>自检：解析开始帧</string>
+           </property>
+           <property name="toolTip">
+            <string>不经端口，本地注入 3D0D，验证[接收][指令]与执行日志。</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="lblLastAction">
+         <property name="text">
+          <string>最近动作：—</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item>
+     <widget class="QGroupBox" name="groupLog">
+      <property name="title">
+       <string>运行记录</string>
+      </property>
+      <layout class="QVBoxLayout" name="logLayout">
+       <item>
+        <widget class="QPlainTextEdit" name="textLog">
+         <property name="readOnly">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="logBtnRow">
+         <item>
+          <widget class="QLabel" name="lblStatus">
+           <property name="text">
+            <string>状态：未打开</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="logSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnClearLog">
+           <property name="text">
+            <string>清空</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </widget>
+    </item>
+   </layout>
+  </widget>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>

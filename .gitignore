@@ -1,0 +1,50 @@
+# 根目录 / 双工程共用忽略
+
+# VS / MSBuild
+.vs/
+**/x64/
+**/Debug/
+**/Release/
+*.user
+*.suo
+*.sdf
+*.opensdf
+*.VC.db
+*.VC.opendb
+ipch/
+
+# 运行时与调试符号（DLL 由本机自行放置，勿提交）
+*.dll
+*.pdb
+*.ilk
+*.exp
+*.obj
+*.iobj
+*.ipdb
+*.log
+*.tlog
+*.recipe
+*.idb
+*.pch
+
+# Qt
+**/moc/
+**/uic/
+**/rcc/
+*.qmlc
+*.jsc
+.qtcreator/
+build/
+build-debug/
+build-release/
+
+# 自检产物 / 临时
+smoke_result.txt
+**/commlab_log*.txt
+*.tmp
+*~
+
+# 系统
+Thumbs.db
+Desktop.ini
+.DS_Store
