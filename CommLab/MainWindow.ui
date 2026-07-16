@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>CommLab — 串口协议数值联调台</string>
+   <string>CommLab — 软件侧</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="rootLayout">
@@ -228,39 +228,16 @@
            <widget class="QComboBox" name="cmbSerialProto"/>
           </item>
           <item row="7" column="0">
-           <widget class="QLabel" name="lblLineFormatCap">
+           <widget class="QLabel" name="lblSerialHintCap">
             <property name="text">
-             <string>线格式</string>
+             <string>库能力</string>
             </property>
            </widget>
           </item>
           <item row="7" column="1">
-           <widget class="QLabel" name="lblLineFormat">
-            <property name="text">
-             <string>115200 8N1</string>
-            </property>
-            <property name="styleSheet">
-             <string notr="true">font-weight: bold;</string>
-            </property>
-            <property name="toolTip">
-             <string>连接前请确认与串口调试助手线格式一致。数据位变更会影响三思协议预期十六进制帧段长。</string>
-            </property>
-           </widget>
-          </item>
-          <item row="8" column="0">
-           <widget class="QLabel" name="lblSerialFixed">
-            <property name="text">
-             <string>操作说明</string>
-            </property>
-           </widget>
-          </item>
-          <item row="8" column="1">
            <widget class="QLabel" name="lblSerialHint">
             <property name="text">
-             <string>主路径：本软件发控制指令至试验机；亦可收对端事件与测量值。</string>
-            </property>
-            <property name="toolTip">
-             <string>本端可发：3D0D 开始、3E0D 停止、6B0D 存图、5A0D 清零。对端回测量或也可发相同指令字节。</string>
+             <string>串口收测量；UDP 19105→19106 发 JSON 指令（Peer 须先打开 19106）</string>
             </property>
             <property name="wordWrap">
              <bool>true</bool>
@@ -287,26 +264,6 @@
           </widget>
          </item>
          <item>
-          <widget class="QPushButton" name="btnSmokeRx">
-           <property name="text">
-            <string>自检：三思接收</string>
-           </property>
-           <property name="toolTip">
-            <string>仅用于网口功能自检。串口联调时无需使用。</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnSmokeTx">
-           <property name="text">
-            <string>自检：JSON 发送</string>
-           </property>
-           <property name="toolTip">
-            <string>仅用于网口发送与发送许可自检。串口联调时无需使用。</string>
-           </property>
-          </widget>
-         </item>
-         <item>
           <spacer name="btnSpacer">
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
@@ -327,26 +284,13 @@
     <item>
      <widget class="QGroupBox" name="groupSend">
       <property name="title">
-       <string>发送（指令→试验机 / 数值）</string>
+       <string>软件发指令（试验机经串口回测量）</string>
       </property>
       <layout class="QVBoxLayout" name="sendLayout">
        <item>
-        <widget class="QCheckBox" name="chkAllowSend">
+        <widget class="QLabel" name="lblRoleHint">
          <property name="text">
-          <string>启用发送许可</string>
-         </property>
-         <property name="toolTip">
-          <string>对应库参数 bInquireSendFlag。未启用时库侧不会实际写出。点击「发送」时将自动启用。</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QLabel" name="lblSendHint">
-         <property name="text">
-          <string>发送后可在运行记录中查看预期帧。</string>
+          <string>主闭环：串口收测量 + UDP JSON 发开始/停止。软件不发 SendData(vector)。</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
@@ -354,42 +298,42 @@
         </widget>
        </item>
        <item>
+        <widget class="QCheckBox" name="chkAllowSend">
+         <property name="text">
+          <string>UDP 指令面发送许可 bInquireSendFlag</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
         <layout class="QHBoxLayout" name="cmdRow">
-         <item>
-          <widget class="QLabel" name="lblCmd">
-           <property name="text">
-            <string>控制指令→试验机</string>
-           </property>
-          </widget>
-         </item>
          <item>
           <widget class="QPushButton" name="btnCmdStart">
            <property name="text">
-            <string>开始 3D0D</string>
-           </property>
-           <property name="toolTip">
-            <string>经 CommHandler::SendData(QString) 发出字节 3D 0D。</string>
+            <string>开始</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="btnCmdStop">
            <property name="text">
-            <string>停止 3E0D</string>
+            <string>停止</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="btnCmdSave">
            <property name="text">
-            <string>存图 6B0D</string>
+            <string>存图</string>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="btnCmdZero">
            <property name="text">
-            <string>清零 5A0D</string>
+            <string>清零</string>
            </property>
           </widget>
          </item>
@@ -398,35 +342,13 @@
            <property name="orientation">
             <enum>Qt::Horizontal</enum>
            </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>40</width>
+             <height>20</height>
+            </size>
+           </property>
           </spacer>
-         </item>
-        </layout>
-       </item>
-       <item>
-        <layout class="QHBoxLayout" name="sendRow">
-         <item>
-          <widget class="QLabel" name="lblSendValues">
-           <property name="text">
-            <string>数值（逗号分隔）</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLineEdit" name="editSendValues">
-           <property name="text">
-            <string>1.0</string>
-           </property>
-           <property name="toolTip">
-            <string>示例：1.0 或 1.0,2.0,3.0。单次最多 32 个数值。</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnSend">
-           <property name="text">
-            <string>发送数值</string>
-           </property>
-          </widget>
          </item>
         </layout>
        </item>
@@ -437,13 +359,6 @@
      <widget class="QLabel" name="lblStatus">
       <property name="text">
        <string>状态：未连接</string>
-      </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QLabel" name="lblCounters">
-      <property name="text">
-       <string>计数：接收数据=0 事件=0 发送尝试=0 错误=0</string>
       </property>
      </widget>
     </item>
@@ -472,13 +387,6 @@
           <widget class="QPushButton" name="btnClearLog">
            <property name="text">
             <string>清空记录</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="btnSaveLog">
-           <property name="text">
-            <string>保存记录</string>
            </property>
           </widget>
          </item>

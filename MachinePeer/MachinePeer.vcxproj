@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
-  MachinePeer: 试验机对端模拟（独立工程，VS2019 + Qt VS Tools, msvc2019_64 x64）.
-  不链接 CommHandler；用 QSerialPort / QUdpSocket 直接对话线协议。
-  打开本目录 MachinePeer.sln，勿与其它联调台工程混编进同一解决方案。
+  MachinePeer: 试验机侧，链接 CommHandler.dll（与 CommLab 相同用法）。
+  VS2019 + Qt VS Tools, msvc2019_64 x64.
   -->
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -78,16 +77,21 @@
       <Optimization>Disabled</Optimization>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>26812;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir).\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir).\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)peerconfig.ini" copy /Y "$(ProjectDir)peerconfig.ini" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)peerconfig.ini" copy /Y "$(ProjectDir)peerconfig.ini" "$(OutDir)"
+if exist "$(ProjectDir)..\CommLab\x64\$(Configuration)\CommHandler.dll" copy /Y "$(ProjectDir)..\CommLab\x64\$(Configuration)\CommHandler.dll" "$(OutDir)"
+if exist "$(ProjectDir)lib\CommHandler.dll" copy /Y "$(ProjectDir)lib\CommHandler.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
@@ -98,28 +102,36 @@
       <Optimization>MaxSpeed</Optimization>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp14</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <DisableSpecificWarnings>26812;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir).\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir).\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)peerconfig.ini" copy /Y "$(ProjectDir)peerconfig.ini" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)peerconfig.ini" copy /Y "$(ProjectDir)peerconfig.ini" "$(OutDir)"
+if exist "$(ProjectDir)..\CommLab\x64\$(Configuration)\CommHandler.dll" copy /Y "$(ProjectDir)..\CommLab\x64\$(Configuration)\CommHandler.dll" "$(OutDir)"
+if exist "$(ProjectDir)lib\CommHandler.dll" copy /Y "$(ProjectDir)lib\CommHandler.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow.cpp" />
-    <ClCompile Include="src\WireCodec.cpp" />
+    <ClCompile Include="src\CommController.cpp" />
     <ClCompile Include="src\PeerConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\MainWindow.h" />
-    <ClInclude Include="src\WireCodec.h" />
+    <QtMoc Include="src\CommController.h" />
     <ClInclude Include="src\PeerConfig.h" />
+    <ClInclude Include="src\ProtoGuide.h" />
+    <ClInclude Include="src\DemoComm.h" />
+    <ClInclude Include="src\IniUtil.h" />
     <QtUic Include="MainWindow.ui" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -122,18 +122,15 @@
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow.cpp" />
     <ClCompile Include="src\CommController.cpp" />
-    <ClCompile Include="src\UdpPeerSimulator.cpp" />
-    <ClCompile Include="src\SmokeRunner.cpp" />
-    <ClCompile Include="src\SerialFramePreview.cpp" />
     <ClCompile Include="src\NetConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\MainWindow.h" />
     <QtMoc Include="src\CommController.h" />
-    <QtMoc Include="src\UdpPeerSimulator.h" />
     <ClInclude Include="src\NetConfig.h" />
-    <ClInclude Include="src\SmokeRunner.h" />
-    <ClInclude Include="src\SerialFramePreview.h" />
+    <ClInclude Include="src\ProtoGuide.h" />
+    <ClInclude Include="src\DemoComm.h" />
+    <ClInclude Include="src\IniUtil.h" />
     <QtUic Include="MainWindow.ui" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -13,7 +13,7 @@ class CommController : public QObject
     Q_OBJECT
 
 public:
-    // 注册元类型并挂接 emitNewData / emitEventMsg 等库回调
+    // 注册元类型并挂接库回调
     explicit CommController(QObject* parent = nullptr);
     // 返回内部 CommHandler，供参数设置与发送调用
     CommHandler* handler() { return &m_comm; }
@@ -23,8 +23,6 @@ public:
 signals:
     // 已在工作线程完成 memcpy 的测量数据
     void safeDataReceived(QVector<double> values, int type);
-    // 串口收到数据但库解析 size=0（未成帧）
-    void measureParseFailed(int type);
     // 库 emitEventMsg 转发的控制事件
     void eventReceived(int ctrlCmd, int viewId, int msg);
     // 库 emitEventMsgAndData 转发的带附加数据事件
@@ -36,4 +34,5 @@ signals:
 
 private:
     CommHandler m_comm;
+    bool m_cmdCollecting = false;
 };

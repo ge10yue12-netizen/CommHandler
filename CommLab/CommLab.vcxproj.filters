@@ -9,18 +9,15 @@
     <ClCompile Include="src\main.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\MainWindow.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\CommController.cpp"><Filter>Source Files</Filter></ClCompile>
-    <ClCompile Include="src\UdpPeerSimulator.cpp"><Filter>Source Files</Filter></ClCompile>
-    <ClCompile Include="src\SmokeRunner.cpp"><Filter>Source Files</Filter></ClCompile>
-    <ClCompile Include="src\SerialFramePreview.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\NetConfig.cpp"><Filter>Source Files</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\MainWindow.h"><Filter>Header Files</Filter></QtMoc>
     <QtMoc Include="src\CommController.h"><Filter>Header Files</Filter></QtMoc>
-    <QtMoc Include="src\UdpPeerSimulator.h"><Filter>Header Files</Filter></QtMoc>
     <ClInclude Include="src\NetConfig.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="src\SmokeRunner.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="src\SerialFramePreview.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\ProtoGuide.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\DemoComm.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\IniUtil.h"><Filter>Header Files</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="MainWindow.ui"><Filter>Form Files</Filter></QtUic>

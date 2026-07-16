@@ -7,7 +7,7 @@
 #include <cstring>
 
 namespace {
-// emitNewData 回调允许的最大 double 个数，防止异常 size 导致越界
+// emitNewData 回调允许的最大 double 个数
 constexpr int kMaxCallbackDoubles = 10000;
 }
 
@@ -17,15 +17,9 @@ CommController::CommController(QObject* parent) : QObject(parent)
     qRegisterMetaType<QVector<double>>("QVector<double>");
     qRegisterMetaType<QVariantMap>("QVariantMap");
 
-    // emitNewData：工作线程内立即 memcpy，再发 safeDataReceived 供 UI 排队处理
     QObject::connect(&m_comm, &CommHandler::emitNewData, this,
                      [this](void* data, int size, int type) {
-                         if (size <= 0 || data == nullptr) {
-                             if (size <= 0)
-                                 emit measureParseFailed(type);
-                             return;
-                         }
-                         if (size >= kMaxCallbackDoubles)
+                         if (size <= 0 || data == nullptr || size >= kMaxCallbackDoubles)
                              return;
                          QVector<double> values(size);
                          std::memcpy(values.data(), data, static_cast<size_t>(size) * sizeof(double));
@@ -33,10 +27,25 @@ CommController::CommController(QObject* parent) : QObject(parent)
                      },
                      Qt::DirectConnection);
 
+    // 试验机侧：同线程去重 START/STOP，并同步 bOnlineCollect
     QObject::connect(&m_comm, &CommHandler::emitEventMsg, this,
                      [this](int ctrlCmd, int viewId, int msg) {
+                         if (msg == W_CUSTOM_COMM_STARTCALC) {
+                             if (m_cmdCollecting)
+                                 return;
+                             m_cmdCollecting = true;
+                             m_comm.SetCommType(NETWORK);
+                             m_comm.setParameter(QStringLiteral("bOnlineCollect"), true);
+                         } else if (msg == W_CUSTOM_COMM_STOPCALC) {
+                             if (!m_cmdCollecting)
+                                 return;
+                             m_cmdCollecting = false;
+                             m_comm.SetCommType(NETWORK);
+                             m_comm.setParameter(QStringLiteral("bOnlineCollect"), false);
+                         }
                          emit eventReceived(ctrlCmd, viewId, msg);
-                     });
+                     },
+                     Qt::DirectConnection);
 
     QObject::connect(&m_comm, &CommHandler::emitEventMsgAndData, this,
                      [this](int ctrlCmd, int viewId, int msg, const QVariantMap& extra) {
