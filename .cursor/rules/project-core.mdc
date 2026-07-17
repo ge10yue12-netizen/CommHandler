@@ -1,0 +1,64 @@
+---
+description: CommHandler 联调 Demo 核心主责——先懂库再验通信
+alwaysApply: true
+---
+
+# 项目核心主责
+
+本仓是 **CommHandler 联调 / 协议验收壳**（CommLab 软件侧 + MachinePeer 试验机侧），不是自写线协议工程。
+
+## 真理源与工作顺序
+
+| 层级 | 路径 / 角色 | 职责 |
+|------|-------------|------|
+| 动态库 | `g:\My_work\2026-7\7-10\CommHandler`（`SocketComm` / `SerialPortComm`） | 协议增删改查、组包/拆包的唯一真理源 |
+| 本仓 | CommLab / MachinePeer | 只调库 API，验证配置→发→收→回调是否符合库行为 |
+
+Agent **必须**按此顺序：
+
+1. 先查库源码中对应协议的 `switch` / 组包 / 拆包 / 发送门禁  
+2. 再查 Demo 是否用对 API 与角色  
+3. 最后才改 Demo（须用户「确认修改」）
+
+**禁止**：自造线协议、旁路库、用库空实现 API 冒充有效发送。
+
+## 角色边界
+
+- **CommLab（软件）**：发指令、收测量；不发测量 `SendData(vector)` 冒充试验机。  
+- **MachinePeer（试验机）**：收指令、发测量；不收软件测量当正常路径。  
+- 能力以库现行 `switch` 为准：库无发送的协议，Demo 应禁发，不得自造。
+
+## 四条验收主线
+
+### 1. 协议的增删改查与使用
+
+- **增 / 改 / 删**：只在库源码协议分支与参数 key 中认定；本仓不单独定义协议号语义。  
+- **使用**：Demo 须正确设置 `SetCommType`、`iProtoType` / `iProtocolType`、连接参数，并遵守软件/试验机角色。
+
+### 2. 数据的添加、修改、打包、发送
+
+- 业务数据进 `std::vector<double>` 或 `QString`，经 `setParameter`（含 `bInquireSendFlag` 等）后调用 `SendData(...)`。  
+- 线上字节由库组包函数决定；核对 Demo 调用是否触发了正确组包路径。  
+- 串口 `SendData(QString)` 若库为空实现，**不得**当作有效写出。
+
+### 3. 数据的收包、解包、使用
+
+- 测量：`emitNewData` → 槽内立刻拷贝（库随后可能 `delete`）。  
+- 指令/事件：`emitEventMsg` / `emitEventMsgAndData`。  
+- Demo 日志只反映库解包结果，不在 Demo 内重解协议帧。
+
+### 4. 如何验证数据正确性
+
+| 验什么 | 怎么验 |
+|--------|--------|
+| 指令 | Lab 发 → Peer 出现对应 `emitEventMsg`（事件码与协议一致） |
+| 测量 | Peer `SendData(vector)`（或库支持的发送 API）→ Lab `emitNewData`，个数/语义符合该协议 |
+| 能力边界 | 库无发送能力 → UI 禁发；强发应对端无有效收 |
+| 负例 | 错长度 / 错协议号 → 对端无有效回调 |
+| 配置 | COM 配对、UDP 端口交叉、`input.iTriggerCtrl` 等满足库触发条件 |
+
+**判据**：本端「发→」日志 ≠ 线上到了；对端「收←」回调才算验过。
+
+## 改文件门禁
+
+与全局 `agent-guard` 一致：方案轮零改动；落盘须用户「确认修改」；提交须「确认提交」。
