@@ -14,12 +14,10 @@
   <ItemGroup>
     <ClCompile Include="src\main.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\MainWindow.cpp"><Filter>Source Files</Filter></ClCompile>
-    <ClCompile Include="src\CommController.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\PeerConfig.cpp"><Filter>Source Files</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\MainWindow.h"><Filter>Header Files</Filter></QtMoc>
-    <QtMoc Include="src\CommController.h"><Filter>Header Files</Filter></QtMoc>
     <ClInclude Include="src\PeerConfig.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\ProtoGuide.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\DemoComm.h"><Filter>Header Files</Filter></ClInclude>

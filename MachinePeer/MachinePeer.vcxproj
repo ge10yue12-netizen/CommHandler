@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
-  MachinePeer: 试验机侧，链接 CommHandler.dll（与 CommLab 相同用法）。
+  MachinePeer: 试验机测试工具（纯 Qt）。不链接 CommHandler.dll。
   VS2019 + Qt VS Tools, msvc2019_64 x64.
   -->
   <ItemGroup Label="ProjectConfigurations">
@@ -78,20 +78,16 @@
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp14</LanguageStandard>
       <DisableSpecificWarnings>26812;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir).\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir).\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)peerconfig.ini" copy /Y "$(ProjectDir)peerconfig.ini" "$(OutDir)"
-if exist "$(ProjectDir)..\CommLab\x64\$(Configuration)\CommHandler.dll" copy /Y "$(ProjectDir)..\CommLab\x64\$(Configuration)\CommHandler.dll" "$(OutDir)"
-if exist "$(ProjectDir)lib\CommHandler.dll" copy /Y "$(ProjectDir)lib\CommHandler.dll" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)peerconfig.ini" copy /Y "$(ProjectDir)peerconfig.ini" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
@@ -103,31 +99,25 @@ if exist "$(ProjectDir)lib\CommHandler.dll" copy /Y "$(ProjectDir)lib\CommHandle
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
       <LanguageStandard>stdcpp14</LanguageStandard>
       <DisableSpecificWarnings>26812;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir).\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir).\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
-      <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)peerconfig.ini" copy /Y "$(ProjectDir)peerconfig.ini" "$(OutDir)"
-if exist "$(ProjectDir)..\CommLab\x64\$(Configuration)\CommHandler.dll" copy /Y "$(ProjectDir)..\CommLab\x64\$(Configuration)\CommHandler.dll" "$(OutDir)"
-if exist "$(ProjectDir)lib\CommHandler.dll" copy /Y "$(ProjectDir)lib\CommHandler.dll" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)peerconfig.ini" copy /Y "$(ProjectDir)peerconfig.ini" "$(OutDir)"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow.cpp" />
-    <ClCompile Include="src\CommController.cpp" />
     <ClCompile Include="src\PeerConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\MainWindow.h" />
-    <QtMoc Include="src\CommController.h" />
     <ClInclude Include="src\PeerConfig.h" />
     <ClInclude Include="src\ProtoGuide.h" />
     <ClInclude Include="src\DemoComm.h" />

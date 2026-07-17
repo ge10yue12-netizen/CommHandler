@@ -4,8 +4,6 @@
 #include <comutil.h>
 #include <QStringList>
 
-// CommHandler 公共类型与参数结构（与库 Common/UIDef.h 同源副本）。
-// 网口 iProtoType / 串口 iProtocolType 现行取值见《CommHandler-验收问答手册》。
 // 五个模块数据类型
 enum COMM_DATA_TYPE {
 	COMM_LVE = 0,
@@ -175,9 +173,7 @@ struct SocketInfo
 	int			iLocalPort;				// 本机端口
 	QString		sPurIP;					// 目的IP
 	int			iPurPort;				// 目的端口	
-	// iProtoType 以 SocketComm 现行 switch 为准（旧「联恒」case 已注释废弃，不对齐）：
-	// 0 JSON | 1 万测 | 2 中机四通道 | 3 三思 | 4 触发存图 | 5 福建威盛 | 6 纳百川全自动 | 7 纳百川识别线条
-	int			iProtoType;
+	int			iProtoType;				// 协议一 联恒光科 协议二 - json 协议三 - 万测  协议四 - 中机通讯 协议五 - 三思实验  
 	bool		bOpenCMD[3];			// 对应开始 结束 退出 控制命令是否开启
 	char		cCMD[3][16];			// 控制命令
 	int			iSymbolType;			// 分割符号的类型	1,逗号  2， 空格  3，分号

@@ -1,25 +1,24 @@
-// MainWindow.cpp — MachinePeer 试验机侧实现
+// MainWindow.cpp — MachinePeer 试验机主窗口实现
 #include "MainWindow.h"
 
-#include "CommController.h"
-#include "CommHandler.h"
 #include "DemoComm.h"
+#include "ProtoCapability.h"
 #include "ProtoGuide.h"
-#include "UIDef.h"
+#include "ReplyParse.h"
 
 #include <QDateTime>
 
-// 构造：默认串口三思
+// 构造：通道默认串口；指令与测数分槽；挂接收包解析
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
-    , m_ctrl(new CommController(this))
 {
     ui.setupUi(this);
     setWindowTitle(QStringLiteral("MachinePeer — 试验机"));
-    ui.cmbCommType->addItems({QStringLiteral("UDP"), QStringLiteral("串口")});
+    ui.cmbCommType->clear();
+    ui.cmbCommType->addItems({QStringLiteral("网口"), QStringLiteral("串口")});
     ui.cmbCommType->setCurrentIndex(1);
-    ProtoGuide::fillProtoCombos(ui.cmbNetProto, ui.cmbSerialProto);
     ProtoGuide::fillSerialCombos(ui.cmbBaud, ui.cmbDataBits, ui.cmbParity, ui.cmbStopBits);
+    refillProtoCombo();
     m_cfg = LoadPeerConfig();
     ui.editLocalIp->setText(m_cfg.localIp);
     ui.editDestIp->setText(m_cfg.destIp);
@@ -27,258 +26,309 @@ MainWindow::MainWindow(QWidget* parent)
     ui.spinDestPort->setValue(m_cfg.destPort);
     ui.spinComPort->setValue(m_cfg.comPort);
 
-    const auto onType = [this](int) { syncUi(); };
-    QObject::connect(ui.cmbCommType, QOverload<int>::of(&QComboBox::currentIndexChanged), this, onType);
-    QObject::connect(ui.cmbNetProto, QOverload<int>::of(&QComboBox::currentIndexChanged), this, onType);
-    QObject::connect(ui.cmbSerialProto, QOverload<int>::of(&QComboBox::currentIndexChanged), this, onType);
+    QObject::connect(ui.cmbCommType, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+                     &MainWindow::onChannelChanged);
+    QObject::connect(ui.cmbProto, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+                     [this](int) { syncUi(); });
     QObject::connect(ui.spinComPort, QOverload<int>::of(&QSpinBox::valueChanged), this,
                      [this](int v) { ui.lblComEcho->setText(QStringLiteral("COM%1").arg(v + 1)); });
     QObject::connect(ui.btnOpen, &QPushButton::clicked, this, &MainWindow::onOpenClicked);
     QObject::connect(ui.btnClose, &QPushButton::clicked, this, &MainWindow::onCloseClicked);
-    QObject::connect(ui.btnSendMeasure, &QPushButton::clicked, this, [this] { sendMeasure(); });
+    QObject::connect(ui.btnSendMeasure, &QPushButton::clicked, this, &MainWindow::onSendMeasureClicked);
     QObject::connect(ui.btnClearLog, &QPushButton::clicked, ui.textLog, &QPlainTextEdit::clear);
-    QObject::connect(m_ctrl, &CommController::safeDataReceived, this, &MainWindow::onSafeData, Qt::QueuedConnection);
-    QObject::connect(m_ctrl, &CommController::eventReceived, this, &MainWindow::onEvent, Qt::QueuedConnection);
-    QObject::connect(m_ctrl, &CommController::eventWithDataReceived, this, &MainWindow::onEventWithData,
-                     Qt::QueuedConnection);
-    QObject::connect(m_ctrl, &CommController::peerConnected, this, &MainWindow::onPeerConnected, Qt::QueuedConnection);
-    QObject::connect(m_ctrl, &CommController::peerDisconnected, this, &MainWindow::onPeerDisconnected,
-                     Qt::QueuedConnection);
+    QObject::connect(ui.btnCmdStart, &QPushButton::clicked, this, &MainWindow::onCmdStart);
+    QObject::connect(ui.btnCmdStop, &QPushButton::clicked, this, &MainWindow::onCmdStop);
+    QObject::connect(ui.btnCmdSave, &QPushButton::clicked, this, &MainWindow::onCmdSave);
+    QObject::connect(ui.btnCmdZero, &QPushButton::clicked, this, &MainWindow::onCmdZero);
+    QObject::connect(&m_serial, &QSerialPort::readyRead, this, &MainWindow::onSerialReadyRead);
+    QObject::connect(&m_udp, &QUdpSocket::readyRead, this, &MainWindow::onUdpReadyRead);
 
     ui.lblComEcho->setText(QStringLiteral("COM%1").arg(ui.spinComPort->value() + 1));
-    m_ready = false;
     syncUi();
-    log(QStringLiteral("[就绪] 先打开；串口发测量，UDP 收软件指令"));
 }
 
+// 析构：关闭串口与 UDP
 MainWindow::~MainWindow()
 {
-    if (m_ctrl) disconnectAll(m_ctrl->handler());
+    closeAll();
 }
 
+// 收发区追加带时戳日志行
 void MainWindow::log(const QString& line)
 {
     ui.textLog->appendPlainText(QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss ")) + line);
 }
 
-QString MainWindow::connSummary() const
+// 按当前通道重填协议下拉并尽量保留原索引
+void MainWindow::refillProtoCombo()
 {
-    if (udp()) {
-        return QStringLiteral("UDP · 本机 %1:%2 · 目的 %3:%4 · %5")
-            .arg(ui.editLocalIp->text().trimmed())
-            .arg(ui.spinLocalPort->value())
-            .arg(ui.editDestIp->text().trimmed())
-            .arg(ui.spinDestPort->value())
-            .arg(ProtoGuide::protoName(true, proto()));
-    }
-    return QStringLiteral("串口 COM%1·%2 + UDP 指令 %3:%4")
-        .arg(ui.spinComPort->value() + 1)
-        .arg(ProtoGuide::protoName(false, serialProto()))
-        .arg(ui.editLocalIp->text().trimmed())
-        .arg(ui.spinLocalPort->value());
+    const int keep = ui.cmbProto->currentIndex();
+    if (isNetwork())
+        ProtoGuide::fillNetProto(ui.cmbProto);
+    else
+        ProtoGuide::fillSerialProto(ui.cmbProto);
+    if (keep >= 0 && keep < ui.cmbProto->count())
+        ui.cmbProto->setCurrentIndex(keep);
 }
 
+// 通道切换：未打开时可换协议列表，并刷新使能
+void MainWindow::onChannelChanged(int)
+{
+    if (!m_ready)
+        refillProtoCombo();
+    syncUi();
+}
+
+// 按库能力使能开始/停止/存图/清零/发力温等按钮
 void MainWindow::syncUi()
 {
-    const bool serialMode = !udp();
-    ui.serialPanel->setVisible(serialMode);
-    ui.udpPanel->setVisible(true);
-    ui.lblNetProto->setVisible(udp());
-    ui.cmbNetProto->setVisible(udp());
-
-    QString line = udp() ? ProtoGuide::statusLine(true, proto())
-                         : ProtoGuide::statusLine(false, serialProto());
-    if (m_ready && serialMode) {
-        line += QStringLiteral(" · 串口%1 UDP%2")
-                    .arg(m_serialUp ? QStringLiteral("OK") : QStringLiteral("FAIL"))
-                    .arg(m_cmdNetUp ? QStringLiteral("OK") : QStringLiteral("FAIL"));
-    }
-    ui.lblStatus->setText(m_ready ? QStringLiteral("已打开 · %1").arg(line)
-                                  : QStringLiteral("未打开 · %1").arg(line));
-
+    // true：当前为网口
+    const bool net = isNetwork();
+    // 当前协议索引
+    const int p = proto();
+    ui.serialPanel->setVisible(!net);
+    ui.udpPanel->setVisible(net);
     ui.btnOpen->setEnabled(!m_ready);
     ui.btnClose->setEnabled(m_ready);
     ui.cmbCommType->setEnabled(!m_ready);
+    ui.cmbProto->setEnabled(!m_ready);
     ui.udpPanel->setEnabled(!m_ready);
     ui.serialPanel->setEnabled(!m_ready);
-    ui.btnSendMeasure->setEnabled(m_ready);
-    ui.editSendValues->setEnabled(m_ready);
-    ui.chkAutoReply->setEnabled(m_ready);
-    ui.editSendValues->setPlaceholderText(ProtoGuide::measurePlaceholder(false, serialProto()));
+    ui.groupOps->setEnabled(m_ready);
+
+    // true：库支持开始指令
+    const bool canStart = m_ready && (net ? ProtoCapability::netCanReceiveCmd(p, 0)
+                                          : ProtoCapability::serialCanReceiveCmd(p, 0));
+    // true：库支持停止指令
+    const bool canStop = m_ready && (net ? ProtoCapability::netCanReceiveCmd(p, 1)
+                                         : ProtoCapability::serialCanReceiveCmd(p, 1));
+    // true：库支持存图指令
+    const bool canSave = m_ready && (net ? ProtoCapability::netCanReceiveCmd(p, 2)
+                                         : ProtoCapability::serialCanReceiveCmd(p, 2));
+    // true：库支持清零指令
+    const bool canZero = m_ready && (net ? ProtoCapability::netCanReceiveCmd(p, 3)
+                                         : ProtoCapability::serialCanReceiveCmd(p, 3));
+    // true：库支持测数入站
+    const bool canMeas = m_ready && (net ? ProtoCapability::netCanReceiveMeasure(p)
+                                         : ProtoCapability::serialCanReceiveMeasure(p));
+
+    ui.btnCmdStart->setEnabled(canStart);
+    ui.btnCmdStop->setEnabled(canStop);
+    ui.btnCmdSave->setEnabled(canSave);
+    ui.btnCmdZero->setEnabled(canZero);
+    ui.btnSendMeasure->setEnabled(canMeas);
+    ui.lblStatus->setText(m_ready ? QStringLiteral("已打开") : QStringLiteral("未打开"));
 }
 
-void MainWindow::applySerialParams()
+// 关闭串口与 UDP，并清空粘包缓冲
+void MainWindow::closeAll()
 {
-    CommHandler* c = m_ctrl->handler();
-    c->SetCommType(SERIAL);
-    applyIoFlags(c, false);
-    c->setParameter(QStringLiteral("iComPort"), ui.spinComPort->value());
-    c->setParameter(QStringLiteral("iComBaud"), ui.cmbBaud->currentIndex());
-    c->setParameter(QStringLiteral("iDataBits"), ui.cmbDataBits->currentData().toInt());
-    c->setParameter(QStringLiteral("iParity"), ui.cmbParity->currentIndex());
-    c->setParameter(QStringLiteral("iStopBits"), ui.cmbStopBits->currentIndex());
-    c->setParameter(QStringLiteral("iProtocolType"), serialProto());
-    c->setParameter(QStringLiteral("dInForceRange"), 100.0);
-    c->setParameter(QStringLiteral("bInquireSendFlag"), ProtoGuide::canSendValues(false, serialProto()));
+    closePeerSerial(&m_serial);
+    closePeerUdp(&m_udp);
+    m_serialRxBuf.clear();
 }
 
-void MainWindow::applyCmdNetParams()
+// 解析软件回包：ACK / 仅力 / 力+温 分记日志
+void MainWindow::handleSoftReply(const QByteArray& raw)
 {
-    CommHandler* c = m_ctrl->handler();
-    PeerConfig cfg = m_cfg;
-    cfg.localIp = ui.editLocalIp->text().trimmed();
-    cfg.destIp = ui.editDestIp->text().trimmed();
-    cfg.localPort = ui.spinLocalPort->value();
-    cfg.destPort = ui.spinDestPort->value();
-    c->SetCommType(NETWORK);
-    applyIoFlags(c, false);
-    c->setParameter(QStringLiteral("iTransferType"), cfg.transferType);
-    c->setParameter(QStringLiteral("iModel"), cfg.model);
-    c->setParameter(QStringLiteral("sLocalIP"), cfg.localIp);
-    c->setParameter(QStringLiteral("iLocalPort"), cfg.localPort);
-    c->setParameter(QStringLiteral("sDestIP"), cfg.destIp);
-    c->setParameter(QStringLiteral("iDestPort"), cfg.destPort);
-    c->setParameter(QStringLiteral("iProtoType"), 0);
-    c->setParameter(QStringLiteral("bInquireSendFlag"), false);
+    if (raw.isEmpty())
+        return;
+    const ReplyParse::Result pr =
+        isNetwork() ? ReplyParse::parseNetReply(proto(), raw) : ReplyParse::parseSerialReply(proto(), raw);
+    if (!pr.ok) {
+        log(QStringLiteral("RX 未解析 %1").arg(pr.detail));
+        return;
+    }
+    if (pr.isAck) {
+        log(QStringLiteral("RX ACK %1").arg(pr.detail));
+        return;
+    }
+    if (pr.hasValues && pr.hasTemp) {
+        log(QStringLiteral("RX 解析 力=%1 温=%2 (%3)")
+                .arg(pr.force, 0, 'g', 12)
+                .arg(pr.temp, 0, 'g', 12)
+                .arg(pr.detail));
+    } else if (pr.hasValues) {
+        // 科新等：库回发无温度字段，禁止打印温=0
+        log(QStringLiteral("RX 解析 力=%1 (%2)").arg(pr.force, 0, 'g', 12).arg(pr.detail));
+    } else {
+        log(QStringLiteral("RX 解析 %1").arg(pr.detail));
+    }
 }
 
-void MainWindow::applyUdpParams()
+// 从编辑框读取力/温；非法时回落缺省 1.0 / 25.0
+bool MainWindow::readForceTemp(double* force, double* temp) const
 {
-    CommHandler* c = m_ctrl->handler();
-    PeerConfig cfg = m_cfg;
-    cfg.localIp = ui.editLocalIp->text().trimmed();
-    cfg.destIp = ui.editDestIp->text().trimmed();
-    cfg.localPort = ui.spinLocalPort->value();
-    cfg.destPort = ui.spinDestPort->value();
-    c->SetCommType(NETWORK);
-    applyIoFlags(c, false);
-    c->setParameter(QStringLiteral("iTransferType"), cfg.transferType);
-    c->setParameter(QStringLiteral("iModel"), cfg.model);
-    c->setParameter(QStringLiteral("sLocalIP"), cfg.localIp);
-    c->setParameter(QStringLiteral("iLocalPort"), cfg.localPort);
-    c->setParameter(QStringLiteral("sDestIP"), cfg.destIp);
-    c->setParameter(QStringLiteral("iDestPort"), cfg.destPort);
-    c->setParameter(QStringLiteral("iProtoType"), proto());
-    c->setParameter(QStringLiteral("bInquireSendFlag"), false);
+    // true：力字段解析成功
+    bool okF = false;
+    // true：温字段解析成功
+    bool okT = false;
+    *force = ui.editForce->text().trimmed().toDouble(&okF);
+    *temp = ui.editTemp->text().trimmed().toDouble(&okT);
+    if (!okF)
+        *force = 1.0;
+    if (!okT)
+        *temp = 25.0;
+    return true;
 }
 
+// 按协议组指令帧并经当前通道写出
+void MainWindow::sendCmd(int cmd)
+{
+    if (!m_ready)
+        return;
+    // 组包失败原因
+    QString fail;
+    if (isNetwork()) {
+        const QByteArray j = packNetCmd(proto(), cmd, &fail);
+        if (j.isEmpty()) {
+            log(QStringLiteral("ERR %1").arg(fail));
+            return;
+        }
+        if (writeUdp(&m_udp, ui.editDestIp->text().trimmed(), ui.spinDestPort->value(), j)) {
+            if (proto() == 2)
+                log(QStringLiteral("TX  %1").arg(QString::fromLatin1(j.toHex().toUpper())));
+            else
+                log(QStringLiteral("TX  %1").arg(QString::fromUtf8(j)));
+        }
+    } else {
+        const QByteArray frame = packSerialCmd(proto(), cmd, &fail);
+        if (frame.isEmpty()) {
+            log(QStringLiteral("ERR %1").arg(fail));
+            return;
+        }
+        // 串口发出的 HEX 文本
+        QString hex;
+        if (writeSerial(&m_serial, frame, &hex))
+            log(QStringLiteral("TX  %1").arg(hex));
+    }
+}
+
+// 打开当前通道（串口或 UDP）
 void MainWindow::onOpenClicked()
 {
-    CommHandler* c = m_ctrl->handler();
-    m_serialUp = false;
-    m_cmdNetUp = false;
-
-    if (udp()) {
-        applyUdpParams();
-        m_cmdNetUp = c->Connect();
-        if (!m_cmdNetUp) {
-            log(QStringLiteral("[连接] 失败 · %1").arg(connSummary()));
-            m_ready = false;
-            syncUi();
-            return;
-        }
-        log(QStringLiteral("[连接] 网口单通道 · %1").arg(connSummary()));
+    closeAll();
+    // 打开失败原因
+    QString fail;
+    // true：打开成功
+    bool ok = false;
+    if (isNetwork()) {
+        ok = openPeerUdp(&m_udp, ui.editLocalIp->text().trimmed(), ui.spinLocalPort->value(), &fail);
     } else {
-        applySerialParams();
-        c->SetCommType(SERIAL);
-        m_serialUp = c->Connect();
-        if (!m_serialUp) {
-            log(QStringLiteral("[连接] 串口失败 · 检查 COM%1").arg(ui.spinComPort->value() + 1));
-            m_ready = false;
-            syncUi();
-            return;
-        }
-        applyCmdNetParams();
-        c->SetCommType(NETWORK);
-        m_cmdNetUp = c->Connect();
-        if (!m_cmdNetUp) {
-            c->SetCommType(SERIAL);
-            c->Disconnect(0);
-            m_serialUp = false;
-            log(QStringLiteral("[连接] UDP 指令面失败 · 端口 %1 是否被占用").arg(ui.spinLocalPort->value()));
-            m_ready = false;
-            syncUi();
-            return;
-        }
-        log(QStringLiteral("[连接] 成功 · %1").arg(connSummary()));
-        log(QStringLiteral("[连接] 串口=测量发 · UDP=指令收"));
+        ok = openPeerSerial(&m_serial, ui.spinComPort->value(), ui.cmbBaud->currentIndex(),
+                            ui.cmbDataBits->currentData().toInt(), ui.cmbParity->currentIndex(),
+                            ui.cmbStopBits->currentIndex(), &fail);
     }
-    m_ready = true;
+    if (!ok)
+        log(QStringLiteral("ERR %1").arg(fail));
+    m_ready = ok;
+    m_serialRxBuf.clear();
     syncUi();
 }
 
+// 关闭当前通道
 void MainWindow::onCloseClicked()
 {
-    disconnectAll(m_ctrl->handler());
+    closeAll();
     m_ready = false;
-    m_serialUp = false;
-    m_cmdNetUp = false;
-    log(QStringLiteral("[连接] 关闭"));
     syncUi();
 }
 
-void MainWindow::sendMeasure()
+// 发送开始指令（不连带发测数）
+void MainWindow::onCmdStart()
 {
-    if (!m_ready) { log(QStringLiteral("[拒发] 未打开")); return; }
-    const QVector<double> v = ProtoGuide::parseValues(ui.editSendValues->text());
-    QString fail;
-    if (!sendValues(m_ctrl->handler(), udp(), udp() ? proto() : serialProto(), v, &fail)) {
-        log(QStringLiteral("[拒发] %1").arg(fail));
+    sendCmd(0);
+}
+
+// 发送停止指令
+void MainWindow::onCmdStop()
+{
+    sendCmd(1);
+}
+
+// 发送存图指令
+void MainWindow::onCmdSave()
+{
+    sendCmd(2);
+}
+
+// 发送清零指令
+void MainWindow::onCmdZero()
+{
+    sendCmd(3);
+}
+
+// 仅发送测数帧（力/温），与指令分离
+void MainWindow::onSendMeasureClicked()
+{
+    if (!m_ready)
         return;
-    }
-    log(QStringLiteral("[发→ 组包] %1")
-            .arg(ProtoGuide::explainSendVector(udp(), udp() ? proto() : serialProto(), v)));
-}
-
-void MainWindow::onSafeData(QVector<double> values, int type)
-{
-    Q_UNUSED(values);
-    Q_UNUSED(type);
-    log(QStringLiteral("[收← 非预期] 试验机不应收测量（仅软件机收 emitNewData）"));
-}
-
-void MainWindow::onEvent(int, int, int msg)
-{
-    if (msg == W_CUSTOM_COMM_STARTCALC) {
-        log(QStringLiteral("[收← 解包] %1").arg(ProtoGuide::explainRecvEvent(msg, CommController::eventName(msg))));
-        if (!ui.chkAutoReply->isChecked())
-            return;
-        const QString text = ui.editSendValues->text().trimmed();
-        if (text.isEmpty()) {
-            const QVector<double> def{1.0};
-            QString fail;
-            if (!sendValues(m_ctrl->handler(), udp(), udp() ? proto() : serialProto(), def, &fail))
-                log(QStringLiteral("[拒发] %1").arg(fail));
-            else
-                log(QStringLiteral("[发→ 组包] %1（自动应答默认 1.0）")
-                        .arg(ProtoGuide::explainSendVector(udp(), udp() ? proto() : serialProto(), def)));
+    // 待发力
+    double force = 1.0;
+    // 待发温
+    double temp = 25.0;
+    readForceTemp(&force, &temp);
+    // 组包失败原因
+    QString fail;
+    if (isNetwork()) {
+        const QByteArray j = packNetMeasure(proto(), force, temp, &fail);
+        if (j.isEmpty()) {
+            log(QStringLiteral("ERR %1").arg(fail));
             return;
         }
-        sendMeasure();
-        return;
+        if (writeUdp(&m_udp, ui.editDestIp->text().trimmed(), ui.spinDestPort->value(), j)) {
+            if (proto() == 2 || proto() == 3)
+                log(QStringLiteral("TX  %1").arg(QString::fromLatin1(j.toHex().toUpper())));
+            else
+                log(QStringLiteral("TX  %1").arg(QString::fromUtf8(j)));
+        }
+    } else {
+        const QByteArray frame = packSerialMeasure(proto(), force, temp, &fail);
+        if (frame.isEmpty()) {
+            log(QStringLiteral("ERR %1").arg(fail));
+            return;
+        }
+        // 串口发出的 HEX 文本
+        QString hex;
+        if (writeSerial(&m_serial, frame, &hex))
+            log(QStringLiteral("TX  %1").arg(hex));
     }
-    if (msg == W_CUSTOM_COMM_STOPCALC) {
-        log(QStringLiteral("[收← 解包] %1").arg(ProtoGuide::explainRecvEvent(msg, CommController::eventName(msg))));
+}
+
+// 串口收软件回传：记 HEX，三思按 0x0D 组帧后再解析
+void MainWindow::onSerialReadyRead()
+{
+    const QByteArray chunk = m_serial.readAll();
+    if (chunk.isEmpty())
         return;
+    log(QStringLiteral("RX  %1").arg(QString::fromLatin1(chunk.toHex().toUpper())));
+    // 三思等以 0x0D 结尾：缓冲后按帧解析；其它协议按当前块解析
+    if (proto() == 0) {
+        m_serialRxBuf.append(chunk);
+        int pos = 0;
+        while ((pos = m_serialRxBuf.indexOf(char(0x0D))) >= 0) {
+            const QByteArray frame = m_serialRxBuf.left(pos + 1);
+            m_serialRxBuf.remove(0, pos + 1);
+            handleSoftReply(frame);
+        }
+    } else {
+        handleSoftReply(chunk);
     }
-    log(QStringLiteral("[收← 解包] %1").arg(ProtoGuide::explainRecvEvent(msg, CommController::eventName(msg))));
 }
 
-void MainWindow::onEventWithData(int, int, int msg, QVariantMap extra)
+// UDP 收软件回传：记原文或 HEX，并按协议解析业务量
+void MainWindow::onUdpReadyRead()
 {
-    QStringList parts;
-    for (auto it = extra.constBegin(); it != extra.constEnd(); ++it)
-        parts << QStringLiteral("%1=%2").arg(it.key(), it.value().toString());
-    log(QStringLiteral("[收← 解包] %1 · 附加 {%2}")
-            .arg(ProtoGuide::explainRecvEvent(msg, CommController::eventName(msg)), parts.join(QLatin1Char(','))));
-}
-
-void MainWindow::onPeerConnected(int, const QString& ip, int port)
-{
-    log(QStringLiteral("[对端] 连入 %1:%2").arg(ip).arg(port));
-}
-
-void MainWindow::onPeerDisconnected()
-{
-    log(QStringLiteral("[对端] 断开"));
+    while (m_udp.hasPendingDatagrams()) {
+        QByteArray datagram;
+        datagram.resize(static_cast<int>(m_udp.pendingDatagramSize()));
+        m_udp.readDatagram(datagram.data(), datagram.size());
+        const QString asText = QString::fromUtf8(datagram);
+        if (!asText.isEmpty() && (asText.at(0) == QLatin1Char('{') || asText.at(0).isDigit()
+                                  || asText.at(0) == QLatin1Char('+') || asText.at(0) == QLatin1Char('-')))
+            log(QStringLiteral("RX  %1").arg(asText));
+        else
+            log(QStringLiteral("RX  %1").arg(QString::fromLatin1(datagram.toHex().toUpper())));
+        handleSoftReply(datagram);
+    }
 }

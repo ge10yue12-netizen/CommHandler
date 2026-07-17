@@ -1,11 +1,5 @@
 #pragma once
 
-// =============================================================================
-// CommHandler 门面头（与动态库导出一致）。用法概要：
-//   SetCommType → setParameter → Connect → SendData / 监听 emitNewData
-// 网口 iProtoType、串口 iProtocolType 真值见仓库《CommHandler-验收问答手册》。
-// =============================================================================
-
 #include "CommBase.h"
 #include <QtCore/qglobal.h>
 #include <QHash>

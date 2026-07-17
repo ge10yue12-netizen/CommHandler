@@ -8,8 +8,7 @@
 #include <Windows.h>
 #include <array>
 
-// 通讯模块抽象基类。注意：SendData(QString) 默认空实现；
-// SerialPortComm 仍为空，SocketComm 才真正写出字符串。
+
 class CommBase :public QObject
 {
 	Q_OBJECT

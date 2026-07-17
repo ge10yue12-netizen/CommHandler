@@ -6,23 +6,23 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>880</width>
-    <height>680</height>
+    <width>640</width>
+    <height>520</height>
    </rect>
   </property>
   <property name="windowTitle">
-   <string>MachinePeer — 试验机侧</string>
+   <string>MachinePeer — 试验机</string>
   </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="rootLayout">
     <item>
      <widget class="QGroupBox" name="groupConfig">
       <property name="title">
-       <string>连接（CommHandler）</string>
+       <string>连接</string>
       </property>
       <layout class="QVBoxLayout" name="configLayout">
        <item>
-        <layout class="QHBoxLayout" name="typeRow">
+        <layout class="QHBoxLayout" name="topRow">
          <item>
           <widget class="QLabel" name="lblCommType">
            <property name="text">
@@ -34,9 +34,19 @@
           <widget class="QComboBox" name="cmbCommType"/>
          </item>
          <item>
+          <widget class="QLabel" name="lblProto">
+           <property name="text">
+            <string>协议</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QComboBox" name="cmbProto"/>
+         </item>
+         <item>
           <widget class="QPushButton" name="btnOpen">
            <property name="text">
-            <string>打开 Connect</string>
+            <string>打开</string>
            </property>
           </widget>
          </item>
@@ -47,43 +57,49 @@
            </property>
           </widget>
          </item>
+         <item>
+          <spacer name="topSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+         <item>
+          <widget class="QLabel" name="lblStatus">
+           <property name="text">
+            <string>未打开</string>
+           </property>
+          </widget>
+         </item>
         </layout>
        </item>
        <item>
         <widget class="QWidget" name="udpPanel">
-         <layout class="QFormLayout" name="udpForm">
-          <item row="0" column="0">
-           <widget class="QLabel" name="lblNetProto">
-            <property name="text">
-             <string>网口协议</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QComboBox" name="cmbNetProto"/>
-          </item>
-          <item row="1" column="0">
+         <layout class="QHBoxLayout" name="udpRow">
+          <item>
            <widget class="QLabel" name="lblLocalIp">
             <property name="text">
-             <string>本机 IP</string>
+             <string>本机</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
+          <item>
            <widget class="QLineEdit" name="editLocalIp">
             <property name="text">
              <string>127.0.0.1</string>
             </property>
-           </widget>
-          </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="lblLocalPort">
-            <property name="text">
-             <string>本机端口</string>
+            <property name="maximumWidth">
+             <number>110</number>
             </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item>
            <widget class="QSpinBox" name="spinLocalPort">
             <property name="minimum">
              <number>1</number>
@@ -96,28 +112,24 @@
             </property>
            </widget>
           </item>
-          <item row="3" column="0">
+          <item>
            <widget class="QLabel" name="lblDestIp">
             <property name="text">
-             <string>目的 IP</string>
+             <string>软件</string>
             </property>
            </widget>
           </item>
-          <item row="3" column="1">
+          <item>
            <widget class="QLineEdit" name="editDestIp">
             <property name="text">
              <string>127.0.0.1</string>
             </property>
-           </widget>
-          </item>
-          <item row="4" column="0">
-           <widget class="QLabel" name="lblDestPort">
-            <property name="text">
-             <string>目的端口</string>
+            <property name="maximumWidth">
+             <number>110</number>
             </property>
            </widget>
           </item>
-          <item row="4" column="1">
+          <item>
            <widget class="QSpinBox" name="spinDestPort">
             <property name="minimum">
              <number>1</number>
@@ -135,87 +147,55 @@
        </item>
        <item>
         <widget class="QWidget" name="serialPanel">
-         <property name="visible">
-          <bool>false</bool>
-         </property>
-         <layout class="QFormLayout" name="serialForm">
-          <item row="0" column="0">
-           <widget class="QLabel" name="lblSerialProto">
-            <property name="text">
-             <string>串口协议</string>
-            </property>
-           </widget>
-          </item>
-          <item row="0" column="1">
-           <widget class="QComboBox" name="cmbSerialProto"/>
-          </item>
-          <item row="1" column="0">
+         <layout class="QHBoxLayout" name="serialRow">
+          <item>
            <widget class="QLabel" name="lblComPort">
             <property name="text">
-             <string>串口序号</string>
+             <string>COM</string>
             </property>
            </widget>
           </item>
-          <item row="1" column="1">
-           <layout class="QHBoxLayout" name="comRow">
-            <item>
-             <widget class="QSpinBox" name="spinComPort">
-              <property name="maximum">
-               <number>255</number>
-              </property>
-              <property name="value">
-               <number>4</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QLabel" name="lblComEcho">
-              <property name="text">
-               <string>COM5</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
+          <item>
+           <widget class="QSpinBox" name="spinComPort">
+            <property name="maximum">
+             <number>255</number>
+            </property>
+            <property name="value">
+             <number>4</number>
+            </property>
+           </widget>
           </item>
-          <item row="2" column="0">
-           <widget class="QLabel" name="lblBaud">
+          <item>
+           <widget class="QLabel" name="lblComEcho">
             <property name="text">
-             <string>波特率</string>
+             <string>COM5</string>
             </property>
            </widget>
           </item>
-          <item row="2" column="1">
+          <item>
            <widget class="QComboBox" name="cmbBaud"/>
           </item>
-          <item row="3" column="0">
-           <widget class="QLabel" name="lblDataBits">
-            <property name="text">
-             <string>数据位</string>
-            </property>
-           </widget>
-          </item>
-          <item row="3" column="1">
+          <item>
            <widget class="QComboBox" name="cmbDataBits"/>
           </item>
-          <item row="4" column="0">
-           <widget class="QLabel" name="lblParity">
-            <property name="text">
-             <string>校验</string>
-            </property>
-           </widget>
-          </item>
-          <item row="4" column="1">
+          <item>
            <widget class="QComboBox" name="cmbParity"/>
           </item>
-          <item row="5" column="0">
-           <widget class="QLabel" name="lblStopBits">
-            <property name="text">
-             <string>停止位</string>
-            </property>
-           </widget>
-          </item>
-          <item row="5" column="1">
+          <item>
            <widget class="QComboBox" name="cmbStopBits"/>
+          </item>
+          <item>
+           <spacer name="serialSpacer">
+            <property name="orientation">
+             <enum>Qt::Horizontal</enum>
+            </property>
+            <property name="sizeHint" stdset="0">
+             <size>
+              <width>20</width>
+              <height>20</height>
+             </size>
+            </property>
+           </spacer>
           </item>
          </layout>
         </widget>
@@ -224,67 +204,164 @@
      </widget>
     </item>
     <item>
-     <widget class="QGroupBox" name="groupMeasure">
+     <widget class="QGroupBox" name="groupOps">
       <property name="title">
-       <string>测量回传（库 SendData）</string>
+       <string>操作</string>
       </property>
-      <layout class="QVBoxLayout" name="measureLayout">
+      <layout class="QVBoxLayout" name="opsLayout">
        <item>
-        <layout class="QHBoxLayout" name="sendRow">
+        <layout class="QHBoxLayout" name="cmdRow">
          <item>
-          <widget class="QLabel" name="lblSend">
+          <widget class="QPushButton" name="btnCmdStart">
            <property name="text">
-            <string>测量数据</string>
+            <string>开始</string>
            </property>
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="editSendValues">
-           <property name="placeholderText">
-            <string>逗号分隔，库支持时回发</string>
+          <widget class="QPushButton" name="btnCmdStop">
+           <property name="text">
+            <string>停止</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnCmdSave">
+           <property name="text">
+            <string>存图</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btnCmdZero">
+           <property name="text">
+            <string>清零</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <spacer name="cmdSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <layout class="QHBoxLayout" name="dataRow">
+         <item>
+          <widget class="QLabel" name="lblForce">
+           <property name="text">
+            <string>力</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="editForce">
+           <property name="text">
+            <string>1.0</string>
+           </property>
+           <property name="maximumWidth">
+            <number>80</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLabel" name="lblTemp">
+           <property name="text">
+            <string>温</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QLineEdit" name="editTemp">
+           <property name="text">
+            <string>25.0</string>
+           </property>
+           <property name="maximumWidth">
+            <number>80</number>
            </property>
           </widget>
          </item>
          <item>
           <widget class="QPushButton" name="btnSendMeasure">
            <property name="text">
-            <string>SendData(vector)</string>
+            <string>发力温</string>
            </property>
           </widget>
          </item>
+         <item>
+          <spacer name="dataSpacer">
+           <property name="orientation">
+            <enum>Qt::Horizontal</enum>
+           </property>
+           <property name="sizeHint" stdset="0">
+            <size>
+             <width>20</width>
+             <height>20</height>
+            </size>
+           </property>
+          </spacer>
+         </item>
         </layout>
-       </item>
-       <item>
-        <widget class="QCheckBox" name="chkAutoReply">
-         <property name="text">
-          <string>收到「开始」后经串口 SendData 回测量（主闭环）</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
        </item>
       </layout>
      </widget>
     </item>
     <item>
-     <widget class="QLabel" name="lblStatus">
-      <property name="text">
-       <string>状态：未打开</string>
-      </property>
-     </widget>
+     <layout class="QHBoxLayout" name="logHeader">
+      <item>
+       <widget class="QLabel" name="lblLogTitle">
+        <property name="text">
+         <string>收发</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <spacer name="logSpacer">
+        <property name="orientation">
+         <enum>Qt::Horizontal</enum>
+        </property>
+        <property name="sizeHint" stdset="0">
+         <size>
+          <width>40</width>
+          <height>20</height>
+         </size>
+        </property>
+       </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="btnClearLog">
+        <property name="text">
+         <string>清空</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </item>
     <item>
      <widget class="QPlainTextEdit" name="textLog">
       <property name="readOnly">
        <bool>true</bool>
       </property>
-     </widget>
-    </item>
-    <item>
-     <widget class="QPushButton" name="btnClearLog">
-      <property name="text">
-       <string>清空日志</string>
+      <property name="maximumBlockCount">
+       <number>2000</number>
+      </property>
+      <property name="placeholderText">
+       <string>RX/TX 数据</string>
+      </property>
+      <property name="font">
+       <font>
+        <family>Consolas</family>
+        <pointsize>10</pointsize>
+       </font>
       </property>
      </widget>
     </item>

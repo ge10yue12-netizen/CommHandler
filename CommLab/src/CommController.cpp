@@ -62,6 +62,8 @@ QString CommController::eventName(int msg)
     case W_CUSTOM_COMM_AUTO_SAVE_IMAGE: return QStringLiteral("存图");
     case W_CUSTOM_ZERO_CLEARING: return QStringLiteral("清零");
     case W_CUSTOM_COMM_SINGALTRIIMAGESAVE: return QStringLiteral("触发存图");
+    case W_CUSTOM_COMM_RESET_LVE_LENGTH: return QStringLiteral("重置标距");
+    case W_CUSTOM_COMM_CALC_LVE_LENGTH: return QStringLiteral("识别线条标距");
     default: return QStringLiteral("0x%1").arg(msg, 0, 16);
     }
 }
