@@ -23,16 +23,10 @@ public:
 signals:
     // 已在工作线程完成 memcpy 的测量数据
     void safeDataReceived(QVector<double> values, int type);
-    // 串口收到数据但库解析 size=0（未成帧）
-    void measureParseFailed(int type);
     // 库 emitEventMsg 转发的控制事件
     void eventReceived(int ctrlCmd, int viewId, int msg);
     // 库 emitEventMsgAndData 转发的带附加数据事件
     void eventWithDataReceived(int ctrlCmd, int viewId, int msg, QVariantMap extra);
-    // 库 emitNewConn 转发的对端连入通知
-    void peerConnected(int iType, QString ip, int port);
-    // 库 emitClientDisConn 转发的对端断开通知
-    void peerDisconnected();
 
 private:
     CommHandler m_comm;

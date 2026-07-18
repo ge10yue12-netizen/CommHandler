@@ -129,7 +129,8 @@
     <QtMoc Include="src\CommController.h" />
     <ClInclude Include="src\NetConfig.h" />
     <ClInclude Include="src\ProtoGuide.h" />
-    <ClInclude Include="src\DemoComm.h" />
+    <ClInclude Include="src\NetworkProtocol.h" />
+    <ClInclude Include="src\SerialProtocol.h" />
     <ClInclude Include="src\IniUtil.h" />
     <QtUic Include="MainWindow.ui" />
   </ItemGroup>

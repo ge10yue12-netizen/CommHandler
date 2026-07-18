@@ -20,7 +20,9 @@
     <QtMoc Include="src\MainWindow.h"><Filter>Header Files</Filter></QtMoc>
     <ClInclude Include="src\PeerConfig.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\ProtoGuide.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="src\DemoComm.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\NetworkProtocol.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\ProtocolResult.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\SerialProtocol.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\IniUtil.h"><Filter>Header Files</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>

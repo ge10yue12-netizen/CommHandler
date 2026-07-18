@@ -120,7 +120,9 @@
     <QtMoc Include="src\MainWindow.h" />
     <ClInclude Include="src\PeerConfig.h" />
     <ClInclude Include="src\ProtoGuide.h" />
-    <ClInclude Include="src\DemoComm.h" />
+    <ClInclude Include="src\NetworkProtocol.h" />
+    <ClInclude Include="src\ProtocolResult.h" />
+    <ClInclude Include="src\SerialProtocol.h" />
     <ClInclude Include="src\IniUtil.h" />
     <QtUic Include="MainWindow.ui" />
   </ItemGroup>

@@ -17,15 +17,10 @@ CommController::CommController(QObject* parent) : QObject(parent)
     qRegisterMetaType<QVector<double>>("QVector<double>");
     qRegisterMetaType<QVariantMap>("QVariantMap");
 
-    // emitNewData：工作线程内立即 memcpy，再发 safeDataReceived 供 UI 排队处理
+    // emitNewData：库线程内立即 memcpy，再发 safeDataReceived 供 UI 排队处理
     QObject::connect(&m_comm, &CommHandler::emitNewData, this,
                      [this](void* data, int size, int type) {
-                         if (size <= 0 || data == nullptr) {
-                             if (size <= 0)
-                                 emit measureParseFailed(type);
-                             return;
-                         }
-                         if (size >= kMaxCallbackDoubles)
+                         if (data == nullptr || size <= 0 || size >= kMaxCallbackDoubles)
                              return;
                          QVector<double> values(size);
                          std::memcpy(values.data(), data, static_cast<size_t>(size) * sizeof(double));
@@ -42,14 +37,6 @@ CommController::CommController(QObject* parent) : QObject(parent)
                      [this](int ctrlCmd, int viewId, int msg, const QVariantMap& extra) {
                          emit eventWithDataReceived(ctrlCmd, viewId, msg, extra);
                      });
-
-    QObject::connect(&m_comm, &CommHandler::emitNewConn, this,
-                     [this](int iType, QString ip, int port) {
-                         emit peerConnected(iType, ip, port);
-                     });
-
-    QObject::connect(&m_comm, &CommHandler::emitClientDisConn, this,
-                     [this]() { emit peerDisconnected(); });
 }
 
 // 将 W_CUSTOM_* 事件宏转为日志用中文名

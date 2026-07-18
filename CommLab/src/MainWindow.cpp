@@ -3,13 +3,27 @@
 
 #include "CommController.h"
 #include "CommHandler.h"
-#include "DemoComm.h"
-#include "ProtoCapability.h"
+#include "NetworkProtocol.h"
 #include "ProtoGuide.h"
+#include "SerialProtocol.h"
 #include "UIDef.h"
 
 #include <QDateTime>
 #include <QJsonDocument>
+#include <exception>
+
+namespace {
+
+// 业务算法扩展点；示例保持输入输出一致，产品可替换为标定或滤波
+void processMeasurement(double forceIn, bool hasTempIn, double tempIn, double* forceOut,
+                        bool* hasTempOut, double* tempOut)
+{
+    *forceOut = forceIn;
+    *hasTempOut = hasTempIn;
+    *tempOut = hasTempIn ? tempIn : 0.0;
+}
+
+} // namespace
 
 // 构造：界面初始化、协议填充、库信号排队到 UI 线程
 MainWindow::MainWindow(QWidget* parent)
@@ -56,7 +70,7 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow()
 {
     if (m_ctrl)
-        disconnectCurrent(m_ctrl->handler());
+        m_ctrl->handler()->Disconnect(0);
 }
 
 // 收发区追加带时戳日志
@@ -90,32 +104,27 @@ void MainWindow::processAndReply()
 {
     if (!m_ready || !ui.chkAllowSend->isChecked() || !m_hasForce || !m_running)
         return;
-    const CommType t = isNetwork() ? NETWORK : SERIAL;
-    const int p = isNetwork() ? netProto() : serialProto();
-    if (!ProtoCapability::canBusinessReply(t, p)) {
-        log(isNetwork() ? QStringLiteral("INFO %1").arg(ProtoCapability::netReplyDenyReason(p))
-                        : QStringLiteral("INFO 本串口协议库无业务回发"));
+    if (isNetwork()) {
+        log(QStringLiteral("INFO %1").arg(NetworkProtocol::replyUnavailableReason(netProto())));
+        return;
+    }
+    const int proto = serialProto();
+    if (!SerialProtocol::canReplyToMeasurement(proto)) {
+        log(QStringLiteral("INFO %1").arg(SerialProtocol::replyUnavailableReason(proto)));
         return;
     }
 
     double forceOut = 0.0;
     double tempOut = 0.0;
-    // true：处理后仍带真实温度
     bool hasTempOut = false;
-    processForceTemp(m_force, m_hasTemp, m_temp, &forceOut, &hasTempOut, &tempOut);
-
-    // 是否把温写入 SendData 的 vector（无入站温或科新仅力时为 false）
-    bool includeTemp = hasTempOut;
-    if (t == SERIAL && ProtoCapability::serialReplyForceOnly(p, hasTempOut))
-        includeTemp = false;
-
-    if (!replyProcessed(m_ctrl->handler(), t, p, forceOut, includeTemp, tempOut))
+    processMeasurement(m_force, m_hasTemp, m_temp, &forceOut, &hasTempOut, &tempOut);
+    if (!SerialProtocol::sendProcessed(m_ctrl->handler(), proto, forceOut, hasTempOut, tempOut))
         return;
 
-    if (includeTemp)
+    if (hasTempOut && proto != 1)
         log(QStringLiteral("TX  F=%1 T=%2 (已 SendData)").arg(forceOut, 0, 'g', 8).arg(tempOut, 0, 'g', 8));
     else
-        log(QStringLiteral("TX  F=%1 (已 SendData,无入站温不回发温)").arg(forceOut, 0, 'g', 8));
+        log(QStringLiteral("TX  F=%1 (已 SendData，仅力)").arg(forceOut, 0, 'g', 8));
 }
 
 // 仅打开当前通道
@@ -127,24 +136,28 @@ void MainWindow::onConnectClicked()
     m_hasTemp = false;
     m_force = 0.0;
     m_temp = 0.0;
-    disconnectCurrent(c);
+    c->Disconnect(0);
 
     bool ok = false;
-    if (isNetwork()) {
-        setupNetwork(c, m_net.transferType, m_net.model, ui.editLocalIp->text().trimmed(),
-                     ui.spinLocalPort->value(), ui.editDestIp->text().trimmed(), ui.spinDestPort->value(),
-                     netProto());
+    try {
+        if (isNetwork()) {
+            NetworkProtocol::configure(c, m_net.transferType, m_net.model,
+                                       ui.editLocalIp->text().trimmed(), ui.spinLocalPort->value(),
+                                       ui.editDestIp->text().trimmed(), ui.spinDestPort->value(),
+                                       netProto());
+        } else {
+            SerialProtocol::configure(c, ui.spinComPort->value(), ui.cmbBaud->currentIndex(),
+                                      ui.cmbDataBits->currentData().toInt(),
+                                      ui.cmbParity->currentIndex(), ui.cmbStopBits->currentIndex(),
+                                      serialProto());
+        }
         ok = c->Connect();
-        if (!ok)
-            log(QStringLiteral("ERR net"));
-    } else {
-        setupSerial(c, ui.spinComPort->value(), ui.cmbBaud->currentIndex(),
-                    ui.cmbDataBits->currentData().toInt(), ui.cmbParity->currentIndex(),
-                    ui.cmbStopBits->currentIndex(), serialProto());
-        ok = c->Connect();
-        if (!ok)
-            log(QStringLiteral("ERR COM%1").arg(ui.spinComPort->value() + 1));
+    } catch (const std::exception& error) {
+        log(QStringLiteral("ERR 配置失败：%1").arg(QString::fromLocal8Bit(error.what())));
     }
+    if (!ok)
+        log(isNetwork() ? QStringLiteral("ERR 网口连接失败")
+                        : QStringLiteral("ERR COM%1 连接失败").arg(ui.spinComPort->value() + 1));
     m_ready = ok;
     if (ok && !isNetwork() && serialProto() == 1)
         m_running = true;
@@ -157,7 +170,7 @@ void MainWindow::onDisconnectClicked()
     if (m_ctrl) {
         if (isNetwork())
             m_ctrl->handler()->setParameter(QStringLiteral("bOnlineCollect"), false);
-        disconnectCurrent(m_ctrl->handler());
+        m_ctrl->handler()->Disconnect(0);
     }
     m_ready = false;
     m_running = false;
@@ -177,9 +190,7 @@ void MainWindow::onSafeData(QVector<double> values, int /*type*/)
     m_hasTemp = false;
     m_temp = 0.0;
 
-    // 三思/科新：values[1] 是状态枚举，不是温度
-    const bool statusNotTemp =
-        !isNetwork() && ProtoCapability::serialSecondIsStatusNotTemp(serialProto());
+    const bool statusNotTemp = !isNetwork() && SerialProtocol::secondValueIsStatus(serialProto());
     if (!statusNotTemp && values.size() >= 2) {
         m_temp = values.at(1);
         m_hasTemp = true;
