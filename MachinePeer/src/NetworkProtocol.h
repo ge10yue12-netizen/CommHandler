@@ -225,6 +225,11 @@ inline ProtocolResult parseZhongji(const QByteArray& raw)
     if (raw.size() == static_cast<int>(sizeof(ZhongjiControl))) {
         ZhongjiControl control{};
         std::memcpy(&control, raw.constData(), sizeof(control));
+        if (control.type != 0x03) {
+            result.detail =
+                QStringLiteral("中机 2B 帧不是 ACK：type=%1").arg(control.type);
+            return result;
+        }
         result.ok = true;
         result.isAck = true;
         result.detail =

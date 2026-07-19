@@ -10,6 +10,8 @@
 #include <QString>
 #include <QStringList>
 #include <QtGlobal>
+#include <array>
+#include <cstring>
 
 namespace SerialProtocol {
 
@@ -119,6 +121,113 @@ inline QByteArray packCommand(int proto, int command, QString* error)
                         : QByteArray("\x24\xFF\x0D\x0A", 4);
 }
 
+// 对齐 SerialPortComm::HexToFloat：将 18 个 HEX 字符解码为 ASCII 数字串
+inline QString hexToFloatAscii(const QByteArray& hexLatin1)
+{
+    QByteArray ascii;
+    for (int i = 0; i + 1 < hexLatin1.size(); i += 2) {
+        const QByteArray pair = hexLatin1.mid(i, 2);
+        if (pair == "2D")
+            ascii.append('-');
+        else if (pair == "2E")
+            ascii.append('.');
+        else if (pair == "30")
+            ascii.append('0');
+        else if (pair == "31")
+            ascii.append('1');
+        else if (pair == "32")
+            ascii.append('2');
+        else if (pair == "33")
+            ascii.append('3');
+        else if (pair == "34")
+            ascii.append('4');
+        else if (pair == "35")
+            ascii.append('5');
+        else if (pair == "36")
+            ascii.append('6');
+        else if (pair == "37")
+            ascii.append('7');
+        else if (pair == "38")
+            ascii.append('8');
+        else if (pair == "39")
+            ascii.append('9');
+    }
+    return QString::fromLatin1(ascii);
+}
+
+// 对齐 SerialPortComm::MsgDataInput PT1：组 9 字节 ASCII 力值体（HexToFloat 可解码）
+inline QByteArray encodeKexinMeasurementBody(double force)
+{
+    const QString numeric = QString::number(qAbs(force), 'f', 4);
+    const int capacity = force < 0.0 ? 8 : 9;
+    if (!qIsFinite(force) || numeric.size() > capacity)
+        return {};
+    QString body;
+    if (force < 0.0) {
+        const int pad = 8 - numeric.size();
+        const QString digits = QString(pad, QLatin1Char('0')) + numeric;
+        body = QLatin1Char('-') + digits;
+    } else {
+        const int pad = 9 - numeric.size();
+        body = QString(pad, QLatin1Char('0')) + numeric;
+    }
+    return body.toLatin1();
+}
+
+// 对齐 SerialPortComm::FixedDoubleToHex（SendData PT1 case 1）：解析 14 字节回包
+inline bool decodeFixedDoubleToHexReply(const QByteArray& raw, double* forceOut, QString* detail)
+{
+    if (raw.size() < 14) {
+        if (detail)
+            *detail = QStringLiteral("科新回包不足 14 字节（当前 %1）").arg(raw.size());
+        return false;
+    }
+    const QByteArray frame = raw.left(14);
+    if (static_cast<unsigned char>(frame.at(13)) != 0x23) {
+        if (detail)
+            *detail = QStringLiteral("科新回包第 14 字节应为 '#' (0x23)");
+        return false;
+    }
+    if (frame.at(7) != char(0x2E)) {
+        if (detail)
+            *detail = QStringLiteral("科新回包第 8 字节应为 '.' (0x2E)");
+        return false;
+    }
+    const QByteArray numField = frame.mid(2, 11);
+    for (char ch : numField) {
+        const unsigned char byte = static_cast<unsigned char>(ch);
+        if (byte != 0x2D && byte != 0x2E && (byte < 0x30 || byte > 0x39)) {
+            if (detail)
+                *detail = QStringLiteral("科新回包含非法 ASCII 0x%1").arg(byte, 2, 16, QLatin1Char('0'));
+            return false;
+        }
+    }
+    bool ok = false;
+    const double value = QString::fromLatin1(numField).toDouble(&ok);
+    if (!ok) {
+        if (detail)
+            *detail = QStringLiteral("科新回包力字段无法转 double：%1")
+                          .arg(QString::fromLatin1(numField));
+        return false;
+    }
+    if (forceOut)
+        *forceOut = value;
+    return true;
+}
+
+// 科新 PT1 软件回包粘包缓冲：按 14 字节定长切帧（对齐 SendData 写出的 byteArray）
+inline QList<QByteArray> takeKexinReplyFrames(QByteArray* buffer)
+{
+    QList<QByteArray> frames;
+    if (!buffer)
+        return frames;
+    while (buffer->size() >= 14) {
+        frames.append(buffer->left(14));
+        buffer->remove(0, 14);
+    }
+    return frames;
+}
+
 // 按 SerialPortComm 测数分支组串口测量帧
 inline QByteArray packMeasurement(int proto, double force, double /*temp*/, QString* error)
 {
@@ -139,11 +248,32 @@ inline QByteArray packMeasurement(int proto, double force, double /*temp*/, QStr
         return frame;
     }
     if (proto == 1) {
-        QString body = force < 0.0
-            ? QLatin1Char('-') + QStringLiteral("%1").arg(-force, 8, 'f', 4, QLatin1Char('0'))
-            : QStringLiteral("%1").arg(force, 9, 'f', 4, QLatin1Char('0'));
-        body = body.right(9);
-        return QByteArray("\x02\x4C", 2) + body.toLatin1();
+        const QByteArray payload = encodeKexinMeasurementBody(force);
+        if (payload.size() != 9) {
+            if (error)
+                *error = QStringLiteral("科新力值超出 9 字节 ASCII 测数体范围");
+            return {};
+        }
+        const QByteArray hexLatin1 = payload.toHex().toUpper();
+        if (hexLatin1.size() != 18) {
+            if (error)
+                *error = QStringLiteral("科新测数 HEX 体应为 18 字符，当前 %1").arg(hexLatin1.size());
+            return {};
+        }
+        bool ok = false;
+        const double roundTrip = hexToFloatAscii(hexLatin1).toDouble(&ok);
+        if (!ok || qAbs(roundTrip - force) > 1e-3) {
+            if (error)
+                *error = QStringLiteral("科新测数体未通过 HexToFloat 往返校验");
+            return {};
+        }
+        const QByteArray frame = QByteArray("\x02\x4C", 2) + payload;
+        if (frame.size() != 11) {
+            if (error)
+                *error = QStringLiteral("科新测数帧必须为 11 字节，当前 %1 字节").arg(frame.size());
+            return {};
+        }
+        return frame;
     }
     return QStringLiteral("%1,0,RUN,0\r\n").arg(force, 0, 'f', 3).toLatin1();
 }
@@ -181,23 +311,104 @@ inline ProtocolResult parseSansi(const QByteArray& raw)
     return result;
 }
 
-// 解析科新 FixedDoubleToHex 仅力回包
+// 解析科新 FixedDoubleToHex 仅力回包（14 字节定长，有效载荷在 [2,13)）
 inline ProtocolResult parseKexin(const QByteArray& raw)
 {
     ProtocolResult result;
-    const int hash = raw.indexOf('#');
-    const QByteArray body = hash >= 0 ? raw.left(hash) : raw;
-    const QRegularExpression expression(QStringLiteral("[-+]?[0-9]+\\.[0-9]+"));
-    const QRegularExpressionMatch match = expression.match(QString::fromLatin1(body));
-    if (!match.hasMatch()) {
-        result.detail = QStringLiteral("科新回包无有效力值");
+    double force = 0.0;
+    if (!decodeFixedDoubleToHexReply(raw, &force, &result.detail))
         return result;
-    }
-    result.force = match.captured(0).toDouble();
+    result.force = force;
     result.ok = true;
     result.hasValues = true;
-    result.detail = QStringLiteral("科新仅力");
+    result.detail = QStringLiteral("科新 FixedDoubleToHex 14B");
     return result;
+}
+
+// 解析 IEEE 56 字节帧并校验头尾、HEX 字段及库定义校验和
+inline ProtocolResult parseIeee(const QByteArray& raw)
+{
+    ProtocolResult result;
+    if (raw.size() != 56 || static_cast<unsigned char>(raw.at(0)) != 0x24
+        || static_cast<unsigned char>(raw.at(1)) != 0x01
+        || static_cast<unsigned char>(raw.at(54)) != 0x0D
+        || static_cast<unsigned char>(raw.at(55)) != 0x0A) {
+        result.detail = QStringLiteral("IEEE 帧长或头尾不匹配");
+        return result;
+    }
+
+    std::array<float, 6> values{};
+    unsigned int byteSum = 0;
+    for (int channel = 0; channel < 6; ++channel) {
+        const QByteArray hex = raw.mid(2 + channel * 8, 8);
+        bool validHex = hex.size() == 8;
+        for (char ch : hex) {
+            const bool digit = ch >= '0' && ch <= '9';
+            const bool upper = ch >= 'A' && ch <= 'F';
+            const bool lower = ch >= 'a' && ch <= 'f';
+            validHex = validHex && (digit || upper || lower);
+        }
+        if (!validHex) {
+            result.detail = QStringLiteral("IEEE 第 %1 路 HEX 字段无效").arg(channel + 1);
+            return result;
+        }
+        const QByteArray networkBytes = QByteArray::fromHex(hex);
+        unsigned char littleEndian[4] = {
+            static_cast<unsigned char>(networkBytes.at(3)),
+            static_cast<unsigned char>(networkBytes.at(2)),
+            static_cast<unsigned char>(networkBytes.at(1)),
+            static_cast<unsigned char>(networkBytes.at(0))};
+        for (unsigned char byte : littleEndian)
+            byteSum += byte;
+        std::memcpy(&values[channel], littleEndian, sizeof(float));
+    }
+
+    const float checksumSource = static_cast<float>(byteSum);
+    unsigned char checksumBytes[sizeof(float)]{};
+    std::memcpy(checksumBytes, &checksumSource, sizeof(float));
+    const QByteArray expectedChecksum =
+        QByteArray(1, static_cast<char>(checksumBytes[1])).toHex().toUpper()
+        + QByteArray(1, static_cast<char>(checksumBytes[0])).toHex().toUpper();
+    if (raw.mid(50, 4).toUpper() != expectedChecksum) {
+        result.detail = QStringLiteral("IEEE 校验和不匹配");
+        return result;
+    }
+
+    result.ok = true;
+    result.hasValues = true;
+    result.hasTemp = true;
+    result.force = values[0];
+    result.temp = values[1];
+    result.detail = QStringLiteral("IEEE 56B 六通道");
+    return result;
+}
+
+// IEEE PT3 软件回包缓冲：按 24 01 帧头和 56 字节定长切帧
+inline QList<QByteArray> takeIeeeReplyFrames(QByteArray* buffer)
+{
+    QList<QByteArray> frames;
+    if (!buffer)
+        return frames;
+    const QByteArray header("\x24\x01", 2);
+    while (!buffer->isEmpty()) {
+        const int headerIndex = buffer->indexOf(header);
+        if (headerIndex < 0) {
+            const bool keepPrefix = buffer->endsWith(char(0x24));
+            buffer->clear();
+            if (keepPrefix)
+                buffer->append(char(0x24));
+            break;
+        }
+        if (headerIndex > 0)
+            buffer->remove(0, headerIndex);
+        if (buffer->size() < 56)
+            break;
+        const QByteArray frame = buffer->left(56);
+        buffer->remove(0, 56);
+        if (parseIeee(frame).ok)
+            frames.append(frame);
+    }
+    return frames;
 }
 
 // 解析冠腾 R{力}#N{温}# 回包
@@ -230,11 +441,10 @@ inline ProtocolResult parseReply(int proto, const QByteArray& raw)
     if (proto == 1)
         return parseKexin(raw);
     if (proto == 3)
-        return ProtocolResult{raw.size() == 56, false, false, false, 0.0, 0.0,
-                              QStringLiteral("IEEE 56 字节 ASC 回包")};
+        return parseIeee(raw);
     if (proto == 4)
         return parseGuanteng(raw);
-    return ProtocolResult{true, true, false, false, 0.0, 0.0,
+    return ProtocolResult{true, false, false, false, 0.0, 0.0,
                           QStringLiteral("时代新材库无业务出站")};
 }
 

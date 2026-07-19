@@ -5,6 +5,7 @@
 
 #include <QMetaType>
 #include <cstring>
+#include <new>
 
 namespace {
 // emitNewData 回调允许的最大 double 个数，防止异常 size 导致越界
@@ -12,7 +13,9 @@ constexpr int kMaxCallbackDoubles = 10000;
 }
 
 // 注册跨线程元类型，并以 DirectConnection 挂接库信号
-CommController::CommController(QObject* parent) : QObject(parent)
+CommController::CommController(QObject* parent)
+    : QObject(parent)
+    , m_channels(&m_comm)
 {
     qRegisterMetaType<QVector<double>>("QVector<double>");
     qRegisterMetaType<QVariantMap>("QVariantMap");
@@ -22,9 +25,14 @@ CommController::CommController(QObject* parent) : QObject(parent)
                      [this](void* data, int size, int type) {
                          if (data == nullptr || size <= 0 || size >= kMaxCallbackDoubles)
                              return;
-                         QVector<double> values(size);
-                         std::memcpy(values.data(), data, static_cast<size_t>(size) * sizeof(double));
-                         emit safeDataReceived(values, type);
+                         try {
+                             QVector<double> values(size);
+                             std::memcpy(values.data(), data,
+                                         static_cast<size_t>(size) * sizeof(double));
+                             emit safeDataReceived(values, type);
+                         } catch (const std::bad_alloc&) {
+                             return;
+                         }
                      },
                      Qt::DirectConnection);
 

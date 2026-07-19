@@ -1,6 +1,7 @@
 // CommController.h — CommHandler 回调线程安全封装（工作线程拷贝，UI 线程收信号）
 #pragma once
 
+#include "CommChannelManager.h"
 #include "CommHandler.h"
 
 #include <QObject>
@@ -17,6 +18,8 @@ public:
     explicit CommController(QObject* parent = nullptr);
     // 返回内部 CommHandler，供参数设置与发送调用
     CommHandler* handler() { return &m_comm; }
+    // 返回串口/网口统一初始化管理器
+    CommChannelManager* channels() { return &m_channels; }
     // 将 W_CUSTOM_* 事件码转为日志显示名
     static QString eventName(int msg);
 
@@ -30,4 +33,6 @@ signals:
 
 private:
     CommHandler m_comm;
+    // 串口/网口初始化、切换与断开统一入口
+    CommChannelManager m_channels;
 };

@@ -41,7 +41,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
     <QtInstall>msvc2019_64</QtInstall>
     <QtModules>core;gui;widgets;network;serialport</QtModules>
-    <QtBuildConfig>debug</QtBuildConfig>
+    <!-- CommHandler 可交付 DLL 使用 Release Qt/CRT；应用保留 /Zi 与 /Od，但 ABI 必须与 DLL 一致。 -->
+    <QtBuildConfig>release</QtBuildConfig>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">
     <QtInstall>msvc2019_64</QtInstall>
@@ -77,21 +78,31 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <!-- SDK 契约枚举 CommType 等为 unscoped enum；不改为 enum class 以免破坏 DLL ABI -->
       <DisableSpecificWarnings>26812;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir).\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_ITERATOR_DEBUG_LEVEL=0;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <!-- 跨 DLL 传递 STL/Any，必须使用 CommHandler Release 的 /MD 与 iterator level 0。 -->
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir).\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\CommHandler\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)netconfig.ini" copy /Y "$(ProjectDir)netconfig.ini" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)netconfig.ini" copy /Y "$(ProjectDir)netconfig.ini" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\Art_DAQ.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\Art_DAQ.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\nicaiu.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\nicaiu.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\NET_AMC3XER.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\NET_AMC3XER.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\Usb_AMC2XE_Dll.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\Usb_AMC2XE_Dll.dll" "$(OutDir)"
+copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" "$(OutDir)"
+copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" "$(OutDir)"
+"E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$(OutDir)CommLab.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
@@ -101,7 +112,7 @@
       <DebugInformationFormat>None</DebugInformationFormat>
       <Optimization>MaxSpeed</Optimization>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <!-- SDK 契约枚举 CommType 等为 unscoped enum；不改为 enum class 以免破坏 DLL ABI -->
       <DisableSpecificWarnings>26812;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalIncludeDirectories>$(ProjectDir)src;$(ProjectDir).\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -111,22 +122,33 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir).\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\CommHandler\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)netconfig.ini" copy /Y "$(ProjectDir)netconfig.ini" "$(OutDir)"</Command>
+      <Command>if exist "$(ProjectDir)netconfig.ini" copy /Y "$(ProjectDir)netconfig.ini" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\Art_DAQ.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\Art_DAQ.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\nicaiu.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\nicaiu.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\NET_AMC3XER.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\NET_AMC3XER.dll" "$(OutDir)"
+if exist "$(ProjectDir)..\CommHandler\x64\Release\Usb_AMC2XE_Dll.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\Usb_AMC2XE_Dll.dll" "$(OutDir)"
+copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" "$(OutDir)"
+copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" "$(OutDir)"
+"E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$(OutDir)CommLab.exe"</Command>
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="src\main.cpp" />
     <ClCompile Include="src\MainWindow.cpp" />
     <ClCompile Include="src\CommController.cpp" />
+    <ClCompile Include="src\CommChannelManager.cpp" />
     <ClCompile Include="src\NetConfig.cpp" />
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\MainWindow.h" />
     <QtMoc Include="src\CommController.h" />
+    <ClInclude Include="src\CommChannelManager.h" />
     <ClInclude Include="src\NetConfig.h" />
     <ClInclude Include="src\ProtoGuide.h" />
     <ClInclude Include="src\NetworkProtocol.h" />

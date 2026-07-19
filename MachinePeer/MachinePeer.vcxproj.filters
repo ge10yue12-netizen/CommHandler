@@ -14,10 +14,12 @@
   <ItemGroup>
     <ClCompile Include="src\main.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\MainWindow.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\PeerChannelManager.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\PeerConfig.cpp"><Filter>Source Files</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\MainWindow.h"><Filter>Header Files</Filter></QtMoc>
+    <QtMoc Include="src\PeerChannelManager.h"><Filter>Header Files</Filter></QtMoc>
     <ClInclude Include="src\PeerConfig.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\ProtoGuide.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\NetworkProtocol.h"><Filter>Header Files</Filter></ClInclude>

@@ -10,7 +10,9 @@
 
 #include <QDateTime>
 #include <QJsonDocument>
+#include <QTimer>
 #include <exception>
+#include <new>
 
 namespace {
 
@@ -50,9 +52,8 @@ MainWindow::MainWindow(QWidget* parent)
     QObject::connect(ui.spinComPort, QOverload<int>::of(&QSpinBox::valueChanged), this,
                      [this](int v) { ui.lblComEcho->setText(QStringLiteral("COM%1").arg(v + 1)); });
     QObject::connect(ui.chkAllowSend, &QCheckBox::toggled, this, [this](bool on) {
-        if (m_ready && m_ctrl) {
-            m_ctrl->handler()->setParameter(QStringLiteral("bInquireSendFlag"), on);
-        }
+        if (m_ready && m_ctrl)
+            m_ctrl->channels()->setReplyEnabled(on);
     });
     QObject::connect(ui.btnConnect, &QPushButton::clicked, this, &MainWindow::onConnectClicked);
     QObject::connect(ui.btnDisconnect, &QPushButton::clicked, this, &MainWindow::onDisconnectClicked);
@@ -70,7 +71,7 @@ MainWindow::MainWindow(QWidget* parent)
 MainWindow::~MainWindow()
 {
     if (m_ctrl)
-        m_ctrl->handler()->Disconnect(0);
+        m_ctrl->channels()->close();
 }
 
 // 收发区追加带时戳日志
@@ -118,48 +119,81 @@ void MainWindow::processAndReply()
     double tempOut = 0.0;
     bool hasTempOut = false;
     processMeasurement(m_force, m_hasTemp, m_temp, &forceOut, &hasTempOut, &tempOut);
-    if (!SerialProtocol::sendProcessed(m_ctrl->handler(), proto, forceOut, hasTempOut, tempOut))
-        return;
 
-    if (hasTempOut && proto != 1)
-        log(QStringLiteral("TX  F=%1 T=%2 (已 SendData)").arg(forceOut, 0, 'g', 8).arg(tempOut, 0, 'g', 8));
-    else
-        log(QStringLiteral("TX  F=%1 (已 SendData，仅力)").arg(forceOut, 0, 'g', 8));
+    CommHandler* handler = m_ctrl->handler();
+    const int protoCopy = proto;
+    const bool hasTempCopy = hasTempOut;
+    const double forceCopy = forceOut;
+    const double tempCopy = tempOut;
+
+    // 推迟到下一事件循环，避免串口回调栈内重入 SendData
+    QTimer::singleShot(0, this, [this, handler, protoCopy, hasTempCopy, forceCopy, tempCopy]() {
+        try {
+            if (!SerialProtocol::sendProcessed(handler, protoCopy, forceCopy, hasTempCopy, tempCopy))
+                return;
+            if (hasTempCopy && protoCopy != 1)
+                log(QStringLiteral("TX  F=%1 T=%2")
+                        .arg(forceCopy, 0, 'g', 8)
+                        .arg(tempCopy, 0, 'g', 8));
+            else
+                log(QStringLiteral("TX  F=%1").arg(forceCopy, 0, 'g', 8));
+        } catch (const std::bad_alloc&) {
+            log(QStringLiteral("ERR SendData 内存分配失败，已跳过回发"));
+        } catch (const std::exception& error) {
+            log(QStringLiteral("ERR SendData：%1").arg(QString::fromLocal8Bit(error.what())));
+        }
+    });
 }
 
-// 仅打开当前通道
-void MainWindow::onConnectClicked()
+// 从串口面板生成完整初始化参数
+SerialChannelSettings MainWindow::serialSettings() const
 {
-    CommHandler* c = m_ctrl->handler();
+    SerialChannelSettings settings;
+    settings.portIndex = ui.spinComPort->value();
+    settings.baudIndex = ui.cmbBaud->currentIndex();
+    settings.dataBitsIndex = ui.cmbDataBits->currentData().toInt();
+    settings.parityIndex = ui.cmbParity->currentIndex();
+    settings.stopBitsIndex = ui.cmbStopBits->currentIndex();
+    settings.protocolIndex = serialProto();
+    return settings;
+}
+
+// 从网口面板生成完整初始化参数
+NetworkChannelSettings MainWindow::networkSettings() const
+{
+    NetworkChannelSettings settings;
+    settings.transferType = m_net.transferType;
+    settings.model = m_net.model;
+    settings.localIp = ui.editLocalIp->text().trimmed();
+    settings.localPort = ui.spinLocalPort->value();
+    settings.destinationIp = ui.editDestIp->text().trimmed();
+    settings.destinationPort = ui.spinDestPort->value();
+    settings.protocolIndex = netProto();
+    return settings;
+}
+
+// 清除运行状态和最近测量值
+void MainWindow::resetRuntimeState()
+{
     m_running = false;
     m_hasForce = false;
     m_hasTemp = false;
     m_force = 0.0;
     m_temp = 0.0;
-    c->Disconnect(0);
+}
 
-    bool ok = false;
-    try {
-        if (isNetwork()) {
-            NetworkProtocol::configure(c, m_net.transferType, m_net.model,
-                                       ui.editLocalIp->text().trimmed(), ui.spinLocalPort->value(),
-                                       ui.editDestIp->text().trimmed(), ui.spinDestPort->value(),
-                                       netProto());
-        } else {
-            SerialProtocol::configure(c, ui.spinComPort->value(), ui.cmbBaud->currentIndex(),
-                                      ui.cmbDataBits->currentData().toInt(),
-                                      ui.cmbParity->currentIndex(), ui.cmbStopBits->currentIndex(),
-                                      serialProto());
-        }
-        ok = c->Connect();
-    } catch (const std::exception& error) {
-        log(QStringLiteral("ERR 配置失败：%1").arg(QString::fromLocal8Bit(error.what())));
-    }
-    if (!ok)
-        log(isNetwork() ? QStringLiteral("ERR 网口连接失败")
-                        : QStringLiteral("ERR COM%1 连接失败").arg(ui.spinComPort->value() + 1));
-    m_ready = ok;
-    if (ok && !isNetwork() && serialProto() == 1)
+// 通过 CommChannelManager 打开当前通道
+void MainWindow::onConnectClicked()
+{
+    resetRuntimeState();
+    QString error;
+    m_ready = isNetwork()
+        ? m_ctrl->channels()->openNetwork(networkSettings(), &error)
+        : m_ctrl->channels()->openSerial(serialSettings(), &error);
+
+    if (!m_ready)
+        log(QStringLiteral("ERR %1").arg(error));
+    if (m_ready && !isNetwork() && serialProto() == 1)
         m_running = true;
     syncUi();
 }
@@ -169,13 +203,11 @@ void MainWindow::onDisconnectClicked()
 {
     if (m_ctrl) {
         if (isNetwork())
-            m_ctrl->handler()->setParameter(QStringLiteral("bOnlineCollect"), false);
-        m_ctrl->handler()->Disconnect(0);
+            m_ctrl->channels()->setNetworkCollecting(false);
+        m_ctrl->channels()->close();
     }
     m_ready = false;
-    m_running = false;
-    m_hasForce = false;
-    m_hasTemp = false;
+    resetRuntimeState();
     syncUi();
 }
 
@@ -212,12 +244,12 @@ void MainWindow::onEvent(int, int, int msg)
         return;
     if (msg == W_CUSTOM_COMM_STARTCALC) {
         if (isNetwork())
-            m_ctrl->handler()->setParameter(QStringLiteral("bOnlineCollect"), true);
+            m_ctrl->channels()->setNetworkCollecting(true);
         m_running = true;
         syncUi();
     } else if (msg == W_CUSTOM_COMM_STOPCALC) {
         if (isNetwork())
-            m_ctrl->handler()->setParameter(QStringLiteral("bOnlineCollect"), false);
+            m_ctrl->channels()->setNetworkCollecting(false);
         m_running = false;
         syncUi();
     }

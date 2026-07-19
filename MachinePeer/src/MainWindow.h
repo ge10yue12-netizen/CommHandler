@@ -1,13 +1,12 @@
 // MainWindow.h — MachinePeer 试验机：发指令/测数，并按库出站格式解析软件回包
 #pragma once
 
+#include "PeerChannelManager.h"
 #include "PeerConfig.h"
 #include "ui_MainWindow.h"
 
 #include <QByteArray>
 #include <QMainWindow>
-#include <QSerialPort>
-#include <QUdpSocket>
 
 // 试验机角色界面；串口与网口互斥；收包解析算好的业务量
 class MainWindow : public QMainWindow
@@ -36,9 +35,9 @@ private slots:
     // 仅发送清零指令（串口三思）
     void onCmdZero();
     // 串口收字节：记 HEX，并按协议解析软件回传
-    void onSerialReadyRead();
+    void onSerialBytesReceived(QByteArray bytes);
     // UDP 收报文：记原文/HEX，并按协议解析软件回传
-    void onUdpReadyRead();
+    void onNetworkDatagramReceived(QByteArray datagram);
     // 通道切换时刷新协议列表与面板
     void onChannelChanged(int);
 
@@ -61,12 +60,14 @@ private:
     void sendCmd(int cmd);
     // 解析软件回包：ACK / 仅力 / 力+温 分记日志
     void handleSoftReply(const QByteArray& raw);
+    // 从串口面板生成完整初始化参数
+    PeerSerialSettings serialSettings() const;
+    // 从网口面板生成完整初始化参数
+    PeerNetworkSettings networkSettings() const;
 
     Ui::MainWindow ui;
-    // 试验机串口（纯 Qt，不经 CommHandler）
-    QSerialPort m_serial;
-    // 试验机 UDP（纯 Qt）
-    QUdpSocket m_udp;
+    // 串口/网口初始化、切换和原始收发统一入口
+    PeerChannelManager m_channels;
     // 默认网络/串口参数（可由 ini 覆盖）
     PeerConfig m_cfg;
     // true：通道已打开，可发指令/测数

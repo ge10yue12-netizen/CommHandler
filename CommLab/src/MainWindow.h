@@ -1,6 +1,7 @@
 // MainWindow.h — CommLab 软件主窗口：试验机指令/测数入站，处理后经库 SendData 回发
 #pragma once
 
+#include "CommChannelManager.h"
 #include "NetConfig.h"
 #include "ui_MainWindow.h"
 
@@ -46,6 +47,12 @@ private:
     int netProto() const { return ui.cmbNetProto->currentData().toInt(); }
     // 处理缓存测数并 SendData；无测力或未开始则不调用 SendData
     void processAndReply();
+    // 从串口面板生成完整初始化参数
+    SerialChannelSettings serialSettings() const;
+    // 从网口面板生成完整初始化参数
+    NetworkChannelSettings networkSettings() const;
+    // 清除运行状态和最近测量值
+    void resetRuntimeState();
 
     Ui::MainWindow ui;
     // 库回调封装

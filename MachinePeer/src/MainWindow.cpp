@@ -39,8 +39,10 @@ MainWindow::MainWindow(QWidget* parent)
     QObject::connect(ui.btnCmdStop, &QPushButton::clicked, this, &MainWindow::onCmdStop);
     QObject::connect(ui.btnCmdSave, &QPushButton::clicked, this, &MainWindow::onCmdSave);
     QObject::connect(ui.btnCmdZero, &QPushButton::clicked, this, &MainWindow::onCmdZero);
-    QObject::connect(&m_serial, &QSerialPort::readyRead, this, &MainWindow::onSerialReadyRead);
-    QObject::connect(&m_udp, &QUdpSocket::readyRead, this, &MainWindow::onUdpReadyRead);
+    QObject::connect(&m_channels, &PeerChannelManager::serialBytesReceived,
+                     this, &MainWindow::onSerialBytesReceived);
+    QObject::connect(&m_channels, &PeerChannelManager::networkDatagramReceived,
+                     this, &MainWindow::onNetworkDatagramReceived);
 
     ui.lblComEcho->setText(QStringLiteral("COM%1").arg(ui.spinComPort->value() + 1));
     syncUi();
@@ -122,8 +124,7 @@ void MainWindow::syncUi()
 // 关闭串口与 UDP，并清空粘包缓冲
 void MainWindow::closeAll()
 {
-    SerialProtocol::close(&m_serial);
-    NetworkProtocol::close(&m_udp);
+    m_channels.close();
     m_serialRxBuf.clear();
 }
 
@@ -143,13 +144,12 @@ void MainWindow::handleSoftReply(const QByteArray& raw)
         return;
     }
     if (pr.hasValues && pr.hasTemp) {
-        log(QStringLiteral("RX 解析 力=%1 温=%2 (%3)")
+        log(QStringLiteral("RX 解析 力=%1 温=%2")
                 .arg(pr.force, 0, 'g', 12)
-                .arg(pr.temp, 0, 'g', 12)
-                .arg(pr.detail));
+                .arg(pr.temp, 0, 'g', 12));
     } else if (pr.hasValues) {
         // 科新等：库回发无温度字段，禁止打印温=0
-        log(QStringLiteral("RX 解析 力=%1 (%2)").arg(pr.force, 0, 'g', 12).arg(pr.detail));
+        log(QStringLiteral("RX 解析 力=%1").arg(pr.force, 0, 'g', 12));
     } else {
         log(QStringLiteral("RX 解析 %1").arg(pr.detail));
     }
@@ -184,13 +184,13 @@ void MainWindow::sendCmd(int cmd)
             log(QStringLiteral("ERR %1").arg(fail));
             return;
         }
-        if (NetworkProtocol::write(&m_udp, ui.editDestIp->text().trimmed(),
-                                   ui.spinDestPort->value(), j)) {
+        if (m_channels.sendNetwork(j, &fail)) {
             if (proto() == 2)
                 log(QStringLiteral("TX  %1").arg(QString::fromLatin1(j.toHex().toUpper())));
             else
                 log(QStringLiteral("TX  %1").arg(QString::fromUtf8(j)));
-        }
+        } else
+            log(QStringLiteral("ERR %1").arg(fail));
     } else {
         const QByteArray frame = SerialProtocol::packCommand(proto(), cmd, &fail);
         if (frame.isEmpty()) {
@@ -199,30 +199,45 @@ void MainWindow::sendCmd(int cmd)
         }
         // 串口发出的 HEX 文本
         QString hex;
-        if (SerialProtocol::write(&m_serial, frame, &hex))
+        if (m_channels.sendSerial(frame, &hex, &fail))
             log(QStringLiteral("TX  %1").arg(hex));
+        else
+            log(QStringLiteral("ERR %1").arg(fail));
     }
 }
 
-// 打开当前通道（串口或 UDP）
+// 从串口面板生成完整初始化参数
+PeerSerialSettings MainWindow::serialSettings() const
+{
+    PeerSerialSettings settings;
+    settings.portIndex = ui.spinComPort->value();
+    settings.baudIndex = ui.cmbBaud->currentIndex();
+    settings.dataBitsIndex = ui.cmbDataBits->currentData().toInt();
+    settings.parityIndex = ui.cmbParity->currentIndex();
+    settings.stopBitsIndex = ui.cmbStopBits->currentIndex();
+    return settings;
+}
+
+// 从网口面板生成完整初始化参数
+PeerNetworkSettings MainWindow::networkSettings() const
+{
+    PeerNetworkSettings settings;
+    settings.localIp = ui.editLocalIp->text().trimmed();
+    settings.localPort = ui.spinLocalPort->value();
+    settings.destinationIp = ui.editDestIp->text().trimmed();
+    settings.destinationPort = ui.spinDestPort->value();
+    return settings;
+}
+
+// 通过 PeerChannelManager 打开当前通道
 void MainWindow::onOpenClicked()
 {
-    closeAll();
-    // 打开失败原因
     QString fail;
-    // true：打开成功
-    bool ok = false;
-    if (isNetwork()) {
-        ok = NetworkProtocol::open(&m_udp, ui.editLocalIp->text().trimmed(),
-                                   ui.spinLocalPort->value(), &fail);
-    } else {
-        ok = SerialProtocol::open(&m_serial, ui.spinComPort->value(), ui.cmbBaud->currentIndex(),
-                                  ui.cmbDataBits->currentData().toInt(),
-                                  ui.cmbParity->currentIndex(), ui.cmbStopBits->currentIndex(), &fail);
-    }
-    if (!ok)
+    m_ready = isNetwork()
+        ? m_channels.openNetwork(networkSettings(), &fail)
+        : m_channels.openSerial(serialSettings(), &fail);
+    if (!m_ready)
         log(QStringLiteral("ERR %1").arg(fail));
-    m_ready = ok;
     m_serialRxBuf.clear();
     syncUi();
 }
@@ -277,13 +292,13 @@ void MainWindow::onSendMeasureClicked()
             log(QStringLiteral("ERR %1").arg(fail));
             return;
         }
-        if (NetworkProtocol::write(&m_udp, ui.editDestIp->text().trimmed(),
-                                   ui.spinDestPort->value(), j)) {
+        if (m_channels.sendNetwork(j, &fail)) {
             if (proto() == 2 || proto() == 3)
                 log(QStringLiteral("TX  %1").arg(QString::fromLatin1(j.toHex().toUpper())));
             else
                 log(QStringLiteral("TX  %1").arg(QString::fromUtf8(j)));
-        }
+        } else
+            log(QStringLiteral("ERR %1").arg(fail));
     } else {
         const QByteArray frame = SerialProtocol::packMeasurement(proto(), force, temp, &fail);
         if (frame.isEmpty()) {
@@ -292,19 +307,19 @@ void MainWindow::onSendMeasureClicked()
         }
         // 串口发出的 HEX 文本
         QString hex;
-        if (SerialProtocol::write(&m_serial, frame, &hex))
+        if (m_channels.sendSerial(frame, &hex, &fail))
             log(QStringLiteral("TX  %1").arg(hex));
+        else
+            log(QStringLiteral("ERR %1").arg(fail));
     }
 }
 
-// 串口收软件回传：记 HEX，三思按 0x0D 组帧后再解析
-void MainWindow::onSerialReadyRead()
+// 串口收软件回传：三思按 0x0D 组帧；科新按 14 字节定长切帧
+void MainWindow::onSerialBytesReceived(QByteArray chunk)
 {
-    const QByteArray chunk = m_serial.readAll();
     if (chunk.isEmpty())
         return;
     log(QStringLiteral("RX  %1").arg(QString::fromLatin1(chunk.toHex().toUpper())));
-    // 三思等以 0x0D 结尾：缓冲后按帧解析；其它协议按当前块解析
     if (proto() == 0) {
         m_serialRxBuf.append(chunk);
         int pos = 0;
@@ -313,22 +328,27 @@ void MainWindow::onSerialReadyRead()
             m_serialRxBuf.remove(0, pos + 1);
             handleSoftReply(frame);
         }
+    } else if (proto() == 1) {
+        m_serialRxBuf.append(chunk);
+        const QList<QByteArray> frames = SerialProtocol::takeKexinReplyFrames(&m_serialRxBuf);
+        for (const QByteArray& frame : frames)
+            handleSoftReply(frame);
+    } else if (proto() == 3) {
+        m_serialRxBuf.append(chunk);
+        const QList<QByteArray> frames = SerialProtocol::takeIeeeReplyFrames(&m_serialRxBuf);
+        for (const QByteArray& frame : frames)
+            handleSoftReply(frame);
     } else {
         handleSoftReply(chunk);
     }
 }
 
 // UDP 收软件回传：记原文或 HEX，并按协议解析业务量
-void MainWindow::onUdpReadyRead()
+void MainWindow::onNetworkDatagramReceived(QByteArray datagram)
 {
-    while (m_udp.hasPendingDatagrams()) {
-        QByteArray datagram;
-        datagram.resize(static_cast<int>(m_udp.pendingDatagramSize()));
-        m_udp.readDatagram(datagram.data(), datagram.size());
-        if (NetworkProtocol::isTextFrame(datagram))
-            log(QStringLiteral("RX  %1").arg(QString::fromUtf8(datagram)));
-        else
-            log(QStringLiteral("RX  %1").arg(QString::fromLatin1(datagram.toHex().toUpper())));
-        handleSoftReply(datagram);
-    }
+    if (NetworkProtocol::isTextFrame(datagram))
+        log(QStringLiteral("RX  %1").arg(QString::fromUtf8(datagram)));
+    else
+        log(QStringLiteral("RX  %1").arg(QString::fromLatin1(datagram.toHex().toUpper())));
+    handleSoftReply(datagram);
 }

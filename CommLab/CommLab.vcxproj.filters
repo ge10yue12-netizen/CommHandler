@@ -9,11 +9,13 @@
     <ClCompile Include="src\main.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\MainWindow.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\CommController.cpp"><Filter>Source Files</Filter></ClCompile>
+    <ClCompile Include="src\CommChannelManager.cpp"><Filter>Source Files</Filter></ClCompile>
     <ClCompile Include="src\NetConfig.cpp"><Filter>Source Files</Filter></ClCompile>
   </ItemGroup>
   <ItemGroup>
     <QtMoc Include="src\MainWindow.h"><Filter>Header Files</Filter></QtMoc>
     <QtMoc Include="src\CommController.h"><Filter>Header Files</Filter></QtMoc>
+    <ClInclude Include="src\CommChannelManager.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\NetConfig.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\ProtoGuide.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\NetworkProtocol.h"><Filter>Header Files</Filter></ClInclude>
