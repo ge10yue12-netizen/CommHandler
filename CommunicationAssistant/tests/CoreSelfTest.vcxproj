@@ -1,0 +1,106 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{B2C3D4E5-F6A7-4890-B123-456789ABCDEF}</ProjectGuid>
+    <Keyword>QtVS_v304</Keyword>
+    <RootNamespace>CoreSelfTest</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.19041.0</WindowsTargetPlatformVersion>
+    <QtMsBuild Condition="'$(QtMsBuild)'=='' OR !Exists('$(QtMsBuild)\qt.targets')">$(MSBuildProjectDirectory)\QtMsBuild</QtMsBuild>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Condition="Exists('$(QtMsBuild)\qt_defaults.props')">
+    <Import Project="$(QtMsBuild)\qt_defaults.props" />
+  </ImportGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
+    <QtInstall>msvc2019_64</QtInstall>
+    <QtModules>core;network;serialport</QtModules>
+    <QtBuildConfig>debug</QtBuildConfig>
+  </PropertyGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(QtMsBuild)\Qt.props" />
+  </ImportGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <OutDir>$(ProjectDir)..\x64\$(Configuration)\</OutDir>
+    <IntDir>$(ProjectDir)..\x64\$(Configuration)\CoreSelfTest\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <ClCompile>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\;$(ProjectDir)..\core;$(ProjectDir)..\transport;$(ProjectDir)..\session;$(ProjectDir)..\services;$(ProjectDir)..\capture;$(ProjectDir)..\legacy;$(ProjectDir)..\..\CommLab\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;CA_LINK_COMMHANDLER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\CommHandler\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>if exist "$(ProjectDir)..\..\CommHandler\x64\Debug\CommHandler.dll" copy /Y "$(ProjectDir)..\..\CommHandler\x64\Debug\CommHandler.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "$(ProjectDir)..\..\CommLab\x64\Debug\nicaiu.dll" copy /Y "$(ProjectDir)..\..\CommLab\x64\Debug\nicaiu.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "$(ProjectDir)..\..\CommHandler\CommSdk\pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.dll" copy /Y "$(ProjectDir)..\..\CommHandler\CommSdk\pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "$(ProjectDir)..\..\CommHandler\CommSdk\pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.dll" copy /Y "$(ProjectDir)..\..\CommHandler\CommSdk\pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "C:\Program Files (x86)\ART Technology\ART-DAQ\Lib\x64\Art_DAQ.dll" copy /Y "C:\Program Files (x86)\ART Technology\ART-DAQ\Lib\x64\Art_DAQ.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+exit /B 0
+</Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="CoreSelfTest.cpp" />
+    <ClCompile Include="..\transport\SerialTransport.cpp" />
+    <ClCompile Include="..\transport\TcpClientTransport.cpp" />
+    <ClCompile Include="..\transport\TcpServerTransport.cpp" />
+    <ClCompile Include="..\transport\UdpTransport.cpp" />
+    <ClCompile Include="..\session\NativeSession.cpp" />
+    <ClCompile Include="..\services\SendScheduler.cpp" />
+    <ClCompile Include="..\capture\CaptureWriter.cpp" />
+    <ClCompile Include="..\capture\CaptureManager.cpp" />
+    <ClCompile Include="..\legacy\LegacyCapability.cpp" />
+    <ClCompile Include="..\legacy\ILegacyBackend.cpp" />
+    <ClCompile Include="..\legacy\LegacyWorker.cpp" />
+    <ClCompile Include="..\legacy\LegacyWatchdog.cpp" />
+    <ClCompile Include="..\legacy\LegacySession.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="..\core\ICommSession.h" />
+    <QtMoc Include="..\core\ITransport.h" />
+    <QtMoc Include="..\transport\SerialTransport.h" />
+    <QtMoc Include="..\transport\TcpClientTransport.h" />
+    <QtMoc Include="..\transport\TcpServerTransport.h" />
+    <QtMoc Include="..\transport\UdpTransport.h" />
+    <QtMoc Include="..\session\NativeSession.h" />
+    <QtMoc Include="..\services\SendScheduler.h" />
+    <QtMoc Include="..\capture\CaptureWriter.h" />
+    <QtMoc Include="..\capture\CaptureManager.h" />
+    <QtMoc Include="..\legacy\ILegacyBackend.h" />
+    <QtMoc Include="..\legacy\LegacyWorker.h" />
+    <QtMoc Include="..\legacy\LegacyWatchdog.h" />
+    <QtMoc Include="..\legacy\LegacySession.h" />
+    <ClInclude Include="..\legacy\LegacyCapability.h" />
+    <ClInclude Include="..\core\HexUtil.h" />
+    <ClInclude Include="..\session\SessionManager.h" />
+    <ClInclude Include="..\capture\CaptureJson.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
+    <Import Project="$(QtMsBuild)\qt.targets" />
+  </ImportGroup>
+  <Import Project="$(ProjectDir)..\msbuild\QtCriticalSectionLocal.targets" Condition="Exists('$(ProjectDir)..\msbuild\QtCriticalSectionLocal.targets')" />
+</Project>

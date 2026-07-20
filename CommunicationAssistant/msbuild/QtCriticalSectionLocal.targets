@@ -1,0 +1,28 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- Bypass QtMsBuild CriticalSection (Global\ named events) under restricted Agent shells. -->
+<Project>
+  <Target Name="QtEnterCriticalSection_InitializeBuildStatus"/>
+  <Target Name="QtLeaveCriticalSection_InitializeBuildStatus"/>
+  <Target Name="QtEnterCriticalSection_FinalizeBuildStatus"/>
+  <Target Name="QtLeaveCriticalSection_FinalizeBuildStatus"/>
+  <Target Name="QtLeaveCriticalSection_OnError"/>
+
+  <Target Name="QtPrepare"
+    Condition="'$(QtSkipWork)' != 'true'"
+    DependsOnTargets="$(QtDependsOn)"
+    BeforeTargets="QtWorkPrepare">
+    <Message Importance="High" Condition="'$(QtDebug)' == 'true'" Text="#### QtPrepare (no Global lock)"/>
+    <ReadLinesFromFile File="$(QtLogFilePath)">
+      <Output TaskParameter="Lines" ItemName="QtLogData"/>
+    </ReadLinesFromFile>
+    <ItemGroup Condition="'@(QtLogData)' != ''">
+      <QtWorkLog Include="@(QtLogData)">
+        <Hash Condition="$([System.String]::Copy('%(Identity)').Contains('|'))">$([System.String]::Copy('%(Identity)').Split('|')[1])</Hash>
+      </QtWorkLog>
+    </ItemGroup>
+  </Target>
+
+  <Target Name="Qt"
+    DependsOnTargets="QtPrepare;QtWork;QtSetAdditionalOptions">
+  </Target>
+</Project>

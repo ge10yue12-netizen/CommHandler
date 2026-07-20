@@ -13,7 +13,6 @@ Global
 		{5F4BD0EA-B4C6-4A2E-983D-759330808A81}.Debug|x64.ActiveCfg = Debug|x64
 		{5F4BD0EA-B4C6-4A2E-983D-759330808A81}.Debug|x64.Build.0 = Debug|x64
 		{5F4BD0EA-B4C6-4A2E-983D-759330808A81}.Release|x64.ActiveCfg = Release|x64
-		{5F4BD0EA-B4C6-4A2E-983D-759330808A81}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

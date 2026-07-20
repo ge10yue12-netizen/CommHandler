@@ -100,15 +100,38 @@ void MainWindow::syncUi()
         ui.lblStatus->setText(m_running ? QStringLiteral("运行中") : QStringLiteral("已连接"));
 }
 
-// 处理入站测数并调用库 SendData；门控失败则绝不调用 SendData
+// 处理入站测数并调用库 SendData
 void MainWindow::processAndReply()
 {
-    if (!m_ready || !ui.chkAllowSend->isChecked() || !m_hasForce || !m_running)
+    if (!m_ready || !ui.chkAllowSend->isChecked() || !m_ctrl || !m_ctrl->handler())
         return;
+
+    CommHandler* handler = m_ctrl->handler();
     if (isNetwork()) {
-        log(QStringLiteral("INFO %1").arg(NetworkProtocol::replyUnavailableReason(netProto())));
+        if (!m_hasForce)
+            return;
+        const int proto = netProto();
+        if (proto != 2)
+            return;
+        try {
+            if (!NetworkProtocol::sendMeasurementReply(handler, proto, m_force, m_hasTemp, m_temp))
+                return;
+            if (m_hasTemp)
+                log(QStringLiteral("TX  F=%1 T=%2")
+                        .arg(m_force, 0, 'g', 8)
+                        .arg(m_temp, 0, 'g', 8));
+            else
+                log(QStringLiteral("TX  F=%1").arg(m_force, 0, 'g', 8));
+        } catch (const std::bad_alloc&) {
+            log(QStringLiteral("ERR SendData 内存分配失败，已跳过回发"));
+        } catch (const std::exception& error) {
+            log(QStringLiteral("ERR SendData：%1").arg(QString::fromLocal8Bit(error.what())));
+        }
         return;
     }
+
+    if (!m_hasForce || !m_running)
+        return;
     const int proto = serialProto();
     if (!SerialProtocol::canReplyToMeasurement(proto)) {
         log(QStringLiteral("INFO %1").arg(SerialProtocol::replyUnavailableReason(proto)));
@@ -120,13 +143,12 @@ void MainWindow::processAndReply()
     bool hasTempOut = false;
     processMeasurement(m_force, m_hasTemp, m_temp, &forceOut, &hasTempOut, &tempOut);
 
-    CommHandler* handler = m_ctrl->handler();
     const int protoCopy = proto;
     const bool hasTempCopy = hasTempOut;
     const double forceCopy = forceOut;
     const double tempCopy = tempOut;
 
-    // 推迟到下一事件循环，避免串口回调栈内重入 SendData
+    // 串口仍推迟到下一事件循环，避免回调栈内重入 SendData
     QTimer::singleShot(0, this, [this, handler, protoCopy, hasTempCopy, forceCopy, tempCopy]() {
         try {
             if (!SerialProtocol::sendProcessed(handler, protoCopy, forceCopy, hasTempCopy, tempCopy))

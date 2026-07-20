@@ -7,6 +7,7 @@
 #include <QString>
 #include <array>
 #include <cstring>
+#include <vector>
 
 namespace NetworkProtocol {
 
@@ -52,18 +53,22 @@ inline void configure(CommHandler* comm, int transferType, int model, const QStr
     }
 }
 
-// 当前动态库没有可用的网口自动业务闭环
-inline bool canReplyToMeasurement(int /*proto*/)
+// 网口 PT2 直调库 SendData，不做额外门控，便于 F11 跟进 SocketComm
+inline bool sendMeasurementReply(CommHandler* comm, int proto, double force, bool hasTemp, double temp)
 {
-    return false;
+    if (!comm || proto != 2)
+        return false;
+    comm->SetCommType(NETWORK);
+    comm->setParameter(QStringLiteral("bInquireSendFlag"), true);
+    comm->SendData(std::vector<double>{force, hasTemp ? temp : -1.0}, NETWORK);
+    return true;
 }
 
-// 返回网口自动业务回发不可用原因
+// 返回其它网口 PT 未实现业务回发时的说明
 inline QString replyUnavailableReason(int proto)
 {
     if (proto == 2)
-        return QStringLiteral("中机库ServerData疑问");
-        //return QStringLiteral("中机库将 17 字节 ServerData 转为 QString，实际仅发 04，数值不可恢复");
+        return QStringLiteral("中机应走 sendMeasurementReply，不应命中此分支");
     if (proto == 3)
         return QStringLiteral("三思网口库无 SendData(vector) 分支");
     if (proto == 5)
