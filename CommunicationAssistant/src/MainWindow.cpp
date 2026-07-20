@@ -5,108 +5,106 @@
 
 #include <QRegularExpression>
 
+#include <QAbstractItemView>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
-#include <QFormLayout>
-#include <QFrame>
+#include <QFile>
+#include <QFileDialog>
+#include <QHeaderView>
 #include <QHBoxLayout>
-#include <QScrollArea>
 #include <QSerialPortInfo>
+#include <QSignalBlocker>
+#include <QTableWidgetItem>
+#include <QTextStream>
 #include <QUuid>
 #include <QVBoxLayout>
+
+#include <algorithm>
 
 namespace {
 
 QString appStyleSheet()
 {
+    // 侧栏密度对齐参考：小字号、矮控件、小行距（SidePanel 作用域优先）
     return QStringLiteral(
-        "QMainWindow { background: #F3F6F9; }"
+        "QMainWindow { background: #F3F6F9; font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif; font-size: 12px; }"
         "QScrollArea#SideScroll { background: #EEF2F6; border: none; }"
         "QWidget#SidePanel {"
         "  background: #EEF2F6;"
         "  border-right: 1px solid #D8DEE6;"
+        "  font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif;"
+        "  font-size: 12px;"
         "}"
         "QWidget#MainPanel { background: #F3F6F9; }"
         "QLabel#AppTitle {"
-        "  font-size: 15px; font-weight: 600; color: #1F2937; padding: 4px 0 12px 0;"
+        "  font-size: 13px; font-weight: 600; color: #1F2937; padding: 0 0 2px 0;"
         "}"
-        "QLabel.Section {"
-        "  font-size: 12px; font-weight: 600; color: #4B5563; padding-top: 10px;"
+        "QLabel#SideSection, QLabel#SideSectionFirst {"
+        "  font-size: 12px; font-weight: 600; color: #374151;"
+        "  padding: 6px 0 0 0; margin: 0;"
+        "  border-top: 1px solid #D8DEE6;"
         "}"
+        "QLabel#SideSectionFirst { border-top: none; padding-top: 0; }"
+        "QLabel#FieldLabel { font-size: 12px; font-weight: 400; color: #4B5563; padding: 0; }"
+        "QWidget#SidePanel QComboBox,"
+        "QWidget#SidePanel QLineEdit,"
+        "QWidget#SidePanel QSpinBox {"
+        "  background: #FFFFFF; border: 1px solid #D1D9E3; border-radius: 3px;"
+        "  padding: 1px 4px; min-height: 20px; max-height: 22px; font-size: 12px; color: #111827;"
+        "}"
+        "QWidget#SidePanel QComboBox:focus,"
+        "QWidget#SidePanel QLineEdit:focus,"
+        "QWidget#SidePanel QSpinBox:focus { border: 1px solid #3B82F6; }"
+        "QWidget#SidePanel QComboBox::drop-down { border: none; width: 16px; }"
+        "QWidget#SidePanel QCheckBox {"
+        "  color: #374151; font-size: 12px; spacing: 4px; padding: 0; min-height: 18px; max-height: 20px;"
+        "}"
+        "QWidget#SidePanel QCheckBox::indicator { width: 13px; height: 13px; }"
+        "QWidget#SidePanel QPushButton#PrimaryButton {"
+        "  background: #3B82F6; color: white; border: none; border-radius: 4px;"
+        "  padding: 4px 6px; min-height: 26px; max-height: 28px; font-size: 12px; font-weight: 600;"
+        "}"
+        "QWidget#SidePanel QPushButton#PrimaryButton:disabled { background: #93C5FD; }"
+        "QWidget#SidePanel QPushButton#PrimaryButton:hover:!disabled { background: #2563EB; }"
+        "QWidget#SidePanel QPushButton#GhostButton {"
+        "  background: transparent; color: #2563EB; border: none; text-align: left;"
+        "  padding: 0; min-height: 18px; font-size: 12px;"
+        "}"
+        "QWidget#SidePanel QPushButton#SecondaryButton {"
+        "  background: #FFFFFF; color: #374151; border: 1px solid #D1D9E3; border-radius: 3px;"
+        "  padding: 2px 4px; min-height: 22px; max-height: 24px; font-size: 12px;"
+        "}"
+        "QWidget#SidePanel QLabel#StatusPill {"
+        "  background: #E8F0FE; color: #1D4ED8; border-radius: 3px;"
+        "  padding: 2px 6px; font-size: 11px; min-height: 18px; max-height: 20px;"
+        "}"
+        "QWidget#SidePanel QLabel#CapTip { color: #6B7280; font-size: 11px; padding: 0; }"
         "QComboBox, QLineEdit, QSpinBox, QPlainTextEdit {"
-        "  background: #FFFFFF;"
-        "  border: 1px solid #D1D9E3;"
-        "  border-radius: 8px;"
-        "  padding: 6px 8px;"
-        "  min-height: 20px;"
-        "  color: #111827;"
+        "  background: #FFFFFF; border: 1px solid #D1D9E3; border-radius: 6px;"
+        "  padding: 4px 8px; min-height: 18px; color: #111827;"
         "}"
-        "QComboBox:focus, QLineEdit:focus, QSpinBox:focus, QPlainTextEdit:focus {"
-        "  border: 1px solid #3B82F6;"
-        "}"
+        "QComboBox:focus, QLineEdit:focus, QSpinBox:focus, QPlainTextEdit:focus { border: 1px solid #3B82F6; }"
         "QComboBox::drop-down { border: none; width: 22px; }"
-        "QPushButton#PrimaryButton {"
-        "  background: #3B82F6;"
-        "  color: white;"
-        "  border: none;"
-        "  border-radius: 10px;"
-        "  padding: 10px;"
-        "  font-weight: 600;"
-        "}"
-        "QPushButton#PrimaryButton:disabled { background: #93C5FD; }"
-        "QPushButton#PrimaryButton:hover:!disabled { background: #2563EB; }"
-        "QPushButton#GhostButton {"
-        "  background: transparent;"
-        "  color: #2563EB;"
-        "  border: none;"
-        "  text-align: left;"
-        "  padding: 4px 0;"
-        "}"
-        "QPushButton#SecondaryButton {"
-        "  background: #FFFFFF;"
-        "  color: #374151;"
-        "  border: 1px solid #D1D9E3;"
-        "  border-radius: 8px;"
-        "  padding: 8px;"
-        "}"
-        "QPushButton#SecondaryButton:disabled { color: #9CA3AF; }"
         "QPushButton#SendButton {"
-        "  background: #3B82F6;"
-        "  color: white;"
-        "  border: none;"
-        "  border-radius: 12px;"
-        "  min-width: 56px;"
-        "  min-height: 56px;"
-        "  font-size: 18px;"
-        "  font-weight: 700;"
+        "  background: #3B82F6; color: white; border: none; border-radius: 10px;"
+        "  min-width: 48px; min-height: 48px; font-size: 16px; font-weight: 700;"
         "}"
         "QPushButton#SendButton:disabled { background: #93C5FD; }"
-        "QPlainTextEdit#LogView {"
-        "  background: #FFFFFF;"
-        "  border: 1px solid #D8DEE6;"
-        "  border-radius: 12px;"
-        "  padding: 8px;"
+        "QPlainTextEdit#LogView, QPlainTextEdit#DataView {"
+        "  background: #FFFFFF; border: 1px solid #D8DEE6; border-radius: 10px; padding: 6px;"
         "  font-family: Consolas, 'Microsoft YaHei UI';"
         "}"
+        "QLabel#PaneTitle { font-size: 12px; font-weight: 600; color: #4B5563; padding: 0 0 2px 2px; }"
+        "QTabWidget#SendTabs::pane {"
+        "  border: 1px solid #D8DEE6; border-radius: 10px; background: #FFFFFF; top: -1px;"
+        "}"
+        "QTableWidget#SendList {"
+        "  background: #FFFFFF; border: 1px solid #D8DEE6; border-radius: 8px; gridline-color: #E5E7EB;"
+        "}"
         "QPlainTextEdit#SendEdit {"
-        "  background: #FFFFFF;"
-        "  border: 1px solid #D8DEE6;"
-        "  border-radius: 12px;"
-        "  min-height: 56px;"
+        "  background: #FFFFFF; border: 1px solid #D8DEE6; border-radius: 10px; min-height: 48px;"
         "}"
-        "QLabel#StatusPill {"
-        "  background: #E8F0FE;"
-        "  color: #1D4ED8;"
-        "  border-radius: 8px;"
-        "  padding: 6px 10px;"
-        "}"
-        "QLabel#CapTip {"
-        "  color: #6B7280;"
-        "  font-size: 11px;"
-        "  padding: 4px 0;"
-        "}"
-        "QCheckBox { color: #374151; spacing: 6px; }"
         "QLabel#FooterStat { color: #6B7280; font-size: 12px; }"
     );
 }
@@ -122,17 +120,19 @@ void fillNetworkProtocols(QComboBox* box)
     box->addItem(QStringLiteral("5 福建威盛"), 5);
     box->addItem(QStringLiteral("6 纳百川自动化"), 6);
     box->addItem(QStringLiteral("7 纳百川线条"), 7);
+    box->addItem(QStringLiteral("8 联恒光科"), 8);
 }
 
 void fillSerialProtocols(QComboBox* box)
 {
     box->clear();
-    // 标签对齐 CommLab ProtoGuide / 基线 §14.3
+    // 标签对齐 CommLab ProtoGuide / 基线 §14.3（含 V1.2.5 联恒=5）
     box->addItem(QStringLiteral("0 三思"), 0);
     box->addItem(QStringLiteral("1 科新"), 1);
     box->addItem(QStringLiteral("2 时代新材"), 2);
     box->addItem(QStringLiteral("3 IEEE（≥5 值）"), 3);
     box->addItem(QStringLiteral("4 冠腾（≥2 值）"), 4);
+    box->addItem(QStringLiteral("5 联恒光科（≥2 值）"), 5);
 }
 
 } // namespace
@@ -145,10 +145,6 @@ MainWindow::MainWindow(QWidget* parent)
     , scheduler_(this)
     , capture_(this)
 {
-    setWindowTitle(QStringLiteral("通信调试助手 — Native / Legacy"));
-    // 默认中等尺寸；侧栏可滚动，避免控件数量把窗口撑过高
-    resize(960, 600);
-    setMinimumSize(800, 520);
     applyStyle();
     buildUi();
 
@@ -156,10 +152,12 @@ MainWindow::MainWindow(QWidget* parent)
 
     connect(&session_, &ca::ICommSession::recordReceived, this, &MainWindow::onRecordReceived);
     connect(&session_, &ca::ICommSession::stateChanged, this, &MainWindow::onSessionStateChanged);
+    connect(&session_, &ca::ICommSession::errorOccurred, this, &MainWindow::onCommError);
     connect(&session_, &ca::NativeSession::channelsChanged, this, &MainWindow::onChannelsChanged);
 
     connect(&legacySession_, &ca::ICommSession::recordReceived, this, &MainWindow::onRecordReceived);
     connect(&legacySession_, &ca::ICommSession::stateChanged, this, &MainWindow::onSessionStateChanged);
+    connect(&legacySession_, &ca::ICommSession::errorOccurred, this, &MainWindow::onCommError);
     connect(&legacySession_, &ca::LegacySession::unresponsive, this, &MainWindow::onLegacyUnresponsive);
 
     connect(&scheduler_, &ca::SendScheduler::taskStopped, this, &MainWindow::onSchedTaskStopped);
@@ -193,6 +191,19 @@ bool MainWindow::isLegacyMode() const
     return workModeCombo_ && workModeCombo_->currentData().toInt() == static_cast<int>(ca::WorkMode::LegacyDll);
 }
 
+bool MainWindow::preferHexDisplay() const
+{
+    return hexDisplayCheck_ && hexDisplayCheck_->isChecked();
+}
+
+bool MainWindow::preferHexSend() const
+{
+    // Legacy 使用 legacySendModeCombo；此处仅表示 Native 发送格式
+    if (isLegacyMode())
+        return false;
+    return hexSendCheck_ && hexSendCheck_->isChecked();
+}
+
 ca::ICommSession* MainWindow::activeSession()
 {
     return isLegacyMode() ? static_cast<ca::ICommSession*>(&legacySession_)
@@ -205,339 +216,236 @@ const ca::ICommSession* MainWindow::activeSession() const
                           : static_cast<const ca::ICommSession*>(&session_);
 }
 
-void MainWindow::buildUi()
+void MainWindow::bindUiWidgets()
 {
-    auto* central = new QWidget(this);
-    setCentralWidget(central);
-    auto* root = new QHBoxLayout(central);
-    root->setContentsMargins(0, 0, 0, 0);
-    root->setSpacing(0);
+    workModeCombo_ = ui_.workModeCombo;
+    transportCombo_ = ui_.transportCombo;
+    paramStack_ = ui_.paramStack;
 
-    // 侧栏放入滚动区：矮屏下可滚，主窗不被参数区最小高度抬高
-    auto* sideScroll = new QScrollArea(central);
-    sideScroll->setObjectName(QStringLiteral("SideScroll"));
-    sideScroll->setWidgetResizable(true);
-    sideScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    sideScroll->setFrameShape(QFrame::NoFrame);
-    sideScroll->setFixedWidth(340);
+    portCombo_ = ui_.portCombo;
+    baudCombo_ = ui_.baudCombo;
+    dataBitsCombo_ = ui_.dataBitsCombo;
+    parityCombo_ = ui_.parityCombo;
+    stopBitsCombo_ = ui_.stopBitsCombo;
 
-    auto* side = new QWidget();
-    side->setObjectName(QStringLiteral("SidePanel"));
-    side->setMinimumWidth(300);
-    auto* sideLay = new QVBoxLayout(side);
-    sideLay->setContentsMargins(16, 16, 16, 16);
-    sideLay->setSpacing(6);
+    tcpHostEdit_ = ui_.tcpHostEdit;
+    tcpPortSpin_ = ui_.tcpPortSpin;
 
-    auto* title = new QLabel(QStringLiteral("通信调试助手"), side);
-    title->setObjectName(QStringLiteral("AppTitle"));
-    sideLay->addWidget(title);
+    tcpServerAddrEdit_ = ui_.tcpServerAddrEdit;
+    tcpServerPortSpin_ = ui_.tcpServerPortSpin;
 
-    auto* workLabel = new QLabel(QStringLiteral("工作模式"), side);
-    workLabel->setProperty("class", "Section");
-    sideLay->addWidget(workLabel);
+    udpLocalAddrEdit_ = ui_.udpLocalAddrEdit;
+    udpLocalPortSpin_ = ui_.udpLocalPortSpin;
+    udpRemoteAddrEdit_ = ui_.udpRemoteAddrEdit;
+    udpRemotePortSpin_ = ui_.udpRemotePortSpin;
 
-    workModeCombo_ = new QComboBox(side);
+    legacyCommTypeCombo_ = ui_.legacyCommTypeCombo;
+    legacyProtocolCombo_ = ui_.legacyProtocolCombo;
+    legacyEndpointStack_ = ui_.legacyEndpointStack;
+    legacyTransferCombo_ = ui_.legacyTransferCombo;
+    legacyModelCombo_ = ui_.legacyModelCombo;
+    legacyLocalAddrEdit_ = ui_.legacyLocalAddrEdit;
+    legacyLocalPortSpin_ = ui_.legacyLocalPortSpin;
+    legacyRemoteAddrEdit_ = ui_.legacyRemoteAddrEdit;
+    legacyRemotePortSpin_ = ui_.legacyRemotePortSpin;
+    legacyPortCombo_ = ui_.legacyPortCombo;
+    legacyBaudCombo_ = ui_.legacyBaudCombo;
+    legacyMockCheck_ = ui_.legacyMockCheck;
+    legacyCapTipLabel_ = ui_.legacyCapTipLabel;
+
+    clientSectionLabel_ = ui_.clientSectionLabel;
+    clientCombo_ = ui_.clientCombo;
+    btnDisconnectClient_ = ui_.btnDisconnectClient;
+
+    btnOpen_ = ui_.btnOpen;
+    statusLabel_ = ui_.statusLabel;
+
+    hexDisplayCheck_ = ui_.hexDisplayCheck;
+    captureEnableCheck_ = ui_.captureEnableCheck;
+    btnClear_ = ui_.btnClear;
+
+    sendTabs_ = ui_.sendTabs;
+    hexSendCheck_ = ui_.hexSendCheck;
+    legacySendModeCombo_ = ui_.legacySendModeCombo;
+    sendEdit_ = ui_.sendEdit;
+    btnSend_ = ui_.btnSend;
+
+    sendListTable_ = ui_.sendListTable;
+    btnListAdd_ = ui_.btnListAdd;
+    btnListRemove_ = ui_.btnListRemove;
+    btnListImport_ = ui_.btnListImport;
+    btnListExport_ = ui_.btnListExport;
+    btnListSendSelected_ = ui_.btnListSendSelected;
+
+    schedModeCombo_ = ui_.schedModeCombo;
+    schedIntervalSpin_ = ui_.schedIntervalSpin;
+    schedCountSpin_ = ui_.schedCountSpin;
+    btnSchedStart_ = ui_.btnSchedStart;
+    btnSchedPause_ = ui_.btnSchedPause;
+    btnSchedResume_ = ui_.btnSchedResume;
+    btnSchedStop_ = ui_.btnSchedStop;
+
+    dataView_ = ui_.dataView;
+    log_ = ui_.log;
+
+    txCountLabel_ = ui_.txCountLabel;
+    rxCountLabel_ = ui_.rxCountLabel;
+    btnResetCount_ = ui_.btnResetCount;
+}
+
+void MainWindow::populateDynamicUi()
+{
+    // 分区 / 字段标签样式（objectName 供 QSS，避免与 uic 成员名冲突）
+    ui_.secConnect->setObjectName(QStringLiteral("SideSectionFirst"));
+    ui_.secReceive->setObjectName(QStringLiteral("SideSection"));
+    ui_.secSend->setObjectName(QStringLiteral("SideSection"));
+    ui_.secOther->setObjectName(QStringLiteral("SideSection"));
+    for (QLabel* lab : {ui_.secWorkMode, ui_.secConn, ui_.clientSectionLabel}) {
+        if (lab)
+            lab->setObjectName(QStringLiteral("FieldLabel"));
+    }
+
+    ui_.sideScroll->setObjectName(QStringLiteral("SideScroll"));
+    ui_.sidePanel->setObjectName(QStringLiteral("SidePanel"));
+    ui_.appTitle->setObjectName(QStringLiteral("AppTitle"));
+    ui_.mainPanel->setObjectName(QStringLiteral("MainPanel"));
+    ui_.btnOpen->setObjectName(QStringLiteral("PrimaryButton"));
+    ui_.statusLabel->setObjectName(QStringLiteral("StatusPill"));
+    ui_.btnDisconnectClient->setObjectName(QStringLiteral("SecondaryButton"));
+    ui_.btnClear->setObjectName(QStringLiteral("GhostButton"));
+    ui_.btnResetCount->setObjectName(QStringLiteral("GhostButton"));
+    ui_.dataTitle->setObjectName(QStringLiteral("PaneTitle"));
+    ui_.logTitle->setObjectName(QStringLiteral("PaneTitle"));
+    ui_.sendWorkbenchTitle->setObjectName(QStringLiteral("PaneTitle"));
+    ui_.dataView->setObjectName(QStringLiteral("DataView"));
+    ui_.log->setObjectName(QStringLiteral("LogView"));
+    ui_.sendTabs->setObjectName(QStringLiteral("SendTabs"));
+    ui_.sendEdit->setObjectName(QStringLiteral("SendEdit"));
+    ui_.btnSend->setObjectName(QStringLiteral("SendButton"));
+    ui_.sendListTable->setObjectName(QStringLiteral("SendList"));
+    ui_.legacyCapTipLabel->setObjectName(QStringLiteral("CapTip"));
+    ui_.listHint->setObjectName(QStringLiteral("CapTip"));
+    ui_.sendSideHint->setObjectName(QStringLiteral("CapTip"));
+    ui_.txCountLabel->setObjectName(QStringLiteral("FooterStat"));
+    ui_.rxCountLabel->setObjectName(QStringLiteral("FooterStat"));
+    for (QPushButton* btn : {ui_.btnListAdd, ui_.btnListRemove, ui_.btnListImport, ui_.btnListExport,
+                             ui_.btnListSendSelected, ui_.btnSchedStart, ui_.btnSchedPause,
+                             ui_.btnSchedResume, ui_.btnSchedStop}) {
+        if (btn)
+            btn->setObjectName(QStringLiteral("SecondaryButton"));
+    }
+
+    // objectName 变更后重刷样式
+    applyStyle();
+
+    workModeCombo_->clear();
     workModeCombo_->addItem(QStringLiteral("原生 Native"), static_cast<int>(ca::WorkMode::Native));
     workModeCombo_->addItem(QStringLiteral("兼容 Legacy DLL"), static_cast<int>(ca::WorkMode::LegacyDll));
-    sideLay->addWidget(workModeCombo_);
 
-    auto* modeLabel = new QLabel(QStringLiteral("连接方式"), side);
-    modeLabel->setProperty("class", "Section");
-    sideLay->addWidget(modeLabel);
-
-    transportCombo_ = new QComboBox(side);
+    transportCombo_->clear();
     transportCombo_->addItem(QStringLiteral("串口"), static_cast<int>(ca::TransportKind::Serial));
     transportCombo_->addItem(QStringLiteral("TCP 客户端"), static_cast<int>(ca::TransportKind::TcpClient));
     transportCombo_->addItem(QStringLiteral("TCP 服务端"), static_cast<int>(ca::TransportKind::TcpServer));
     transportCombo_->addItem(QStringLiteral("UDP"), static_cast<int>(ca::TransportKind::Udp));
-    sideLay->addWidget(transportCombo_);
 
-    paramStack_ = new QStackedWidget(side);
-
-    // —— 串口页 ——
-    auto* serialPage = new QWidget(paramStack_);
-    auto* serialForm = new QFormLayout(serialPage);
-    serialForm->setContentsMargins(0, 8, 0, 0);
-    serialForm->setSpacing(8);
-    portCombo_ = new QComboBox(serialPage);
+    portCombo_->clear();
     const auto ports = QSerialPortInfo::availablePorts();
     for (const QSerialPortInfo& p : ports) {
-        const QString tip = p.description().isEmpty() ? p.portName()
-                                                      : QStringLiteral("%1（%2）").arg(p.portName(), p.description());
+        const QString tip = p.description().isEmpty()
+                                ? p.portName()
+                                : QStringLiteral("%1（%2）").arg(p.portName(), p.description());
         portCombo_->addItem(tip, p.portName());
     }
     if (portCombo_->count() == 0)
         portCombo_->addItem(QStringLiteral("COM3"), QStringLiteral("COM3"));
 
-    baudCombo_ = new QComboBox(serialPage);
+    baudCombo_->clear();
     for (int b : {9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600})
         baudCombo_->addItem(QString::number(b), b);
     baudCombo_->setCurrentText(QStringLiteral("115200"));
 
-    dataBitsCombo_ = new QComboBox(serialPage);
+    dataBitsCombo_->clear();
     dataBitsCombo_->addItem(QStringLiteral("8"), 8);
     dataBitsCombo_->addItem(QStringLiteral("7"), 7);
     dataBitsCombo_->addItem(QStringLiteral("6"), 6);
     dataBitsCombo_->addItem(QStringLiteral("5"), 5);
 
-    parityCombo_ = new QComboBox(serialPage);
+    parityCombo_->clear();
     parityCombo_->addItem(QStringLiteral("无"), QStringLiteral("none"));
     parityCombo_->addItem(QStringLiteral("偶"), QStringLiteral("even"));
     parityCombo_->addItem(QStringLiteral("奇"), QStringLiteral("odd"));
 
-    stopBitsCombo_ = new QComboBox(serialPage);
+    stopBitsCombo_->clear();
     stopBitsCombo_->addItem(QStringLiteral("1"), QStringLiteral("1"));
     stopBitsCombo_->addItem(QStringLiteral("1.5"), QStringLiteral("1.5"));
     stopBitsCombo_->addItem(QStringLiteral("2"), QStringLiteral("2"));
 
-    serialForm->addRow(QStringLiteral("端口"), portCombo_);
-    serialForm->addRow(QStringLiteral("波特率"), baudCombo_);
-    serialForm->addRow(QStringLiteral("数据位"), dataBitsCombo_);
-    serialForm->addRow(QStringLiteral("校验"), parityCombo_);
-    serialForm->addRow(QStringLiteral("停止位"), stopBitsCombo_);
-    paramStack_->addWidget(serialPage);
-
-    // —— TCP 客户端页 ——
-    auto* tcpPage = new QWidget(paramStack_);
-    auto* tcpForm = new QFormLayout(tcpPage);
-    tcpForm->setContentsMargins(0, 8, 0, 0);
-    tcpForm->setSpacing(8);
-    tcpHostEdit_ = new QLineEdit(QStringLiteral("127.0.0.1"), tcpPage);
-    tcpPortSpin_ = new QSpinBox(tcpPage);
-    tcpPortSpin_->setRange(1, 65535);
-    tcpPortSpin_->setValue(9000);
-    tcpForm->addRow(QStringLiteral("远端地址"), tcpHostEdit_);
-    tcpForm->addRow(QStringLiteral("远端端口"), tcpPortSpin_);
-    paramStack_->addWidget(tcpPage);
-
-    // —— TCP 服务端页 ——
-    auto* tcpServerPage = new QWidget(paramStack_);
-    auto* tcpServerForm = new QFormLayout(tcpServerPage);
-    tcpServerForm->setContentsMargins(0, 8, 0, 0);
-    tcpServerForm->setSpacing(8);
-    tcpServerAddrEdit_ = new QLineEdit(QStringLiteral("0.0.0.0"), tcpServerPage);
-    tcpServerPortSpin_ = new QSpinBox(tcpServerPage);
-    tcpServerPortSpin_->setRange(1, 65535);
-    tcpServerPortSpin_->setValue(9000);
-    tcpServerForm->addRow(QStringLiteral("本地地址"), tcpServerAddrEdit_);
-    tcpServerForm->addRow(QStringLiteral("本地端口"), tcpServerPortSpin_);
-    paramStack_->addWidget(tcpServerPage);
-
-    // —— UDP 页 ——
-    auto* udpPage = new QWidget(paramStack_);
-    auto* udpForm = new QFormLayout(udpPage);
-    udpForm->setContentsMargins(0, 8, 0, 0);
-    udpForm->setSpacing(8);
-    udpLocalAddrEdit_ = new QLineEdit(QStringLiteral("0.0.0.0"), udpPage);
-    udpLocalPortSpin_ = new QSpinBox(udpPage);
-    udpLocalPortSpin_->setRange(1, 65535);
-    udpLocalPortSpin_->setValue(9001);
-    udpRemoteAddrEdit_ = new QLineEdit(QStringLiteral("127.0.0.1"), udpPage);
-    udpRemotePortSpin_ = new QSpinBox(udpPage);
-    udpRemotePortSpin_->setRange(1, 65535);
-    udpRemotePortSpin_->setValue(9002);
-    udpForm->addRow(QStringLiteral("本地地址"), udpLocalAddrEdit_);
-    udpForm->addRow(QStringLiteral("本地端口"), udpLocalPortSpin_);
-    udpForm->addRow(QStringLiteral("远端地址"), udpRemoteAddrEdit_);
-    udpForm->addRow(QStringLiteral("远端端口"), udpRemotePortSpin_);
-    paramStack_->addWidget(udpPage);
-
-    // —— Legacy 页 ——
-    auto* legacyPage = new QWidget(paramStack_);
-    auto* legacyForm = new QFormLayout(legacyPage);
-    legacyForm->setContentsMargins(0, 8, 0, 0);
-    legacyForm->setSpacing(8);
-    legacyCommTypeCombo_ = new QComboBox(legacyPage);
+    legacyCommTypeCombo_->clear();
     legacyCommTypeCombo_->addItem(QStringLiteral("网口 Network"), 0);
     legacyCommTypeCombo_->addItem(QStringLiteral("串口 Serial"), 1);
-    legacyProtocolCombo_ = new QComboBox(legacyPage);
+
+    legacyProtocolCombo_->clear();
     fillNetworkProtocols(legacyProtocolCombo_);
 
-    legacyEndpointStack_ = new QStackedWidget(legacyPage);
-    auto* legacyNet = new QWidget(legacyEndpointStack_);
-    auto* legacyNetForm = new QFormLayout(legacyNet);
-    legacyNetForm->setContentsMargins(0, 0, 0, 0);
-    legacyTransferCombo_ = new QComboBox(legacyNet);
+    legacyTransferCombo_->clear();
     legacyTransferCombo_->addItem(QStringLiteral("TCP"), 0);
     legacyTransferCombo_->addItem(QStringLiteral("UDP"), 1);
-    legacyModelCombo_ = new QComboBox(legacyNet);
+
+    legacyModelCombo_->clear();
     legacyModelCombo_->addItem(QStringLiteral("服务端"), 0);
     legacyModelCombo_->addItem(QStringLiteral("客户端"), 1);
     legacyModelCombo_->setCurrentIndex(1);
-    legacyLocalAddrEdit_ = new QLineEdit(QStringLiteral("127.0.0.1"), legacyNet);
-    legacyLocalPortSpin_ = new QSpinBox(legacyNet);
-    legacyLocalPortSpin_->setRange(0, 65535);
-    legacyLocalPortSpin_->setValue(0);
-    legacyRemoteAddrEdit_ = new QLineEdit(QStringLiteral("127.0.0.1"), legacyNet);
-    legacyRemotePortSpin_ = new QSpinBox(legacyNet);
-    legacyRemotePortSpin_->setRange(1, 65535);
-    legacyRemotePortSpin_->setValue(9000);
-    legacyNetForm->addRow(QStringLiteral("传输"), legacyTransferCombo_);
-    legacyNetForm->addRow(QStringLiteral("角色"), legacyModelCombo_);
-    legacyNetForm->addRow(QStringLiteral("本地地址"), legacyLocalAddrEdit_);
-    legacyNetForm->addRow(QStringLiteral("本地端口"), legacyLocalPortSpin_);
-    legacyNetForm->addRow(QStringLiteral("远端地址"), legacyRemoteAddrEdit_);
-    legacyNetForm->addRow(QStringLiteral("远端端口"), legacyRemotePortSpin_);
-    legacyEndpointStack_->addWidget(legacyNet);
 
-    auto* legacySer = new QWidget(legacyEndpointStack_);
-    auto* legacySerForm = new QFormLayout(legacySer);
-    legacySerForm->setContentsMargins(0, 0, 0, 0);
-    legacyPortCombo_ = new QComboBox(legacySer);
+    legacyPortCombo_->clear();
     for (int i = 0; i < portCombo_->count(); ++i)
         legacyPortCombo_->addItem(portCombo_->itemText(i), portCombo_->itemData(i));
-    legacyBaudCombo_ = new QComboBox(legacySer);
+
+    legacyBaudCombo_->clear();
     for (int b : {4800, 9600, 19200, 38400, 57600, 115200})
         legacyBaudCombo_->addItem(QString::number(b), b);
     legacyBaudCombo_->setCurrentText(QStringLiteral("115200"));
-    legacySerForm->addRow(QStringLiteral("端口"), legacyPortCombo_);
-    legacySerForm->addRow(QStringLiteral("波特率"), legacyBaudCombo_);
-    legacyEndpointStack_->addWidget(legacySer);
 
-    legacyMockCheck_ = new QCheckBox(QStringLiteral("使用 Mock 后端（不调 DLL）"), legacyPage);
 #if defined(CA_LINK_COMMHANDLER) && CA_LINK_COMMHANDLER
     legacyMockCheck_->setChecked(false);
 #else
     legacyMockCheck_->setChecked(true);
 #endif
-    legacyCapTipLabel_ = new QLabel(legacyPage);
-    legacyCapTipLabel_->setObjectName(QStringLiteral("CapTip"));
-    legacyCapTipLabel_->setWordWrap(true);
 
-    legacyForm->addRow(QStringLiteral("通信类型"), legacyCommTypeCombo_);
-    legacyForm->addRow(QStringLiteral("协议"), legacyProtocolCombo_);
-    legacyForm->addRow(QStringLiteral("端点"), legacyEndpointStack_);
-    legacyForm->addRow(QString(), legacyMockCheck_);
-    legacyForm->addRow(QStringLiteral("能力"), legacyCapTipLabel_);
-    paramStack_->addWidget(legacyPage); // index 4
-
-    sideLay->addWidget(paramStack_);
-
-    btnOpen_ = new QPushButton(QStringLiteral("打开连接"), side);
-    btnOpen_->setObjectName(QStringLiteral("PrimaryButton"));
-    sideLay->addWidget(btnOpen_);
-
-    statusLabel_ = new QLabel(QStringLiteral("状态：已创建"), side);
-    statusLabel_->setObjectName(QStringLiteral("StatusPill"));
-    sideLay->addWidget(statusLabel_);
-
-    clientSectionLabel_ = new QLabel(QStringLiteral("已连接客户端"), side);
-    clientSectionLabel_->setProperty("class", "Section");
-    sideLay->addWidget(clientSectionLabel_);
-
-    clientCombo_ = new QComboBox(side);
+    clientCombo_->clear();
     clientCombo_->addItem(QStringLiteral("全部（广播）"), QString());
-    sideLay->addWidget(clientCombo_);
 
-    btnDisconnectClient_ = new QPushButton(QStringLiteral("断开选中客户端"), side);
-    btnDisconnectClient_->setObjectName(QStringLiteral("SecondaryButton"));
-    sideLay->addWidget(btnDisconnectClient_);
+    legacySendModeCombo_->clear();
+    legacySendModeCombo_->addItem(QStringLiteral("Legacy：自动"), FormatAuto);
+    legacySendModeCombo_->addItem(QStringLiteral("Legacy：数值CSV"), FormatValues);
+    legacySendModeCombo_->addItem(QStringLiteral("Legacy：透明文本"), FormatText);
 
-    auto* rxSec = new QLabel(QStringLiteral("接收设置"), side);
-    rxSec->setProperty("class", "Section");
-    sideLay->addWidget(rxSec);
-    hexDisplayCheck_ = new QCheckBox(QStringLiteral("十六进制显示"), side);
-    hexDisplayCheck_->setChecked(true);
-    sideLay->addWidget(hexDisplayCheck_);
+    ensureSendListHeaders();
+    sendListTable_->horizontalHeader()->setStretchLastSection(true);
+    sendListTable_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
 
-    auto* txSec = new QLabel(QStringLiteral("发送设置"), side);
-    txSec->setProperty("class", "Section");
-    sideLay->addWidget(txSec);
-    hexSendCheck_ = new QCheckBox(QStringLiteral("十六进制发送"), side);
-    hexSendCheck_->setChecked(true);
-    sideLay->addWidget(hexSendCheck_);
-    captureEnableCheck_ = new QCheckBox(QStringLiteral("抓包落盘（JSONL）"), side);
-    captureEnableCheck_->setChecked(true);
-    sideLay->addWidget(captureEnableCheck_);
-
-    auto* schedSec = new QLabel(QStringLiteral("发送调度"), side);
-    schedSec->setProperty("class", "Section");
-    sideLay->addWidget(schedSec);
-
-    schedModeCombo_ = new QComboBox(side);
-    schedModeCombo_->addItem(QStringLiteral("单次"), static_cast<int>(ca::ScheduleMode::Once));
-    schedModeCombo_->addItem(QStringLiteral("周期（无限）"), static_cast<int>(ca::ScheduleMode::Infinite));
-    schedModeCombo_->addItem(QStringLiteral("指定次数"), static_cast<int>(ca::ScheduleMode::Counted));
+    schedModeCombo_->clear();
+    schedModeCombo_->addItem(QStringLiteral("单次（仅首行）"), static_cast<int>(ca::ScheduleMode::Once));
     schedModeCombo_->addItem(QStringLiteral("列表轮询"), static_cast<int>(ca::ScheduleMode::RoundRobin));
-    sideLay->addWidget(schedModeCombo_);
+    schedModeCombo_->addItem(QStringLiteral("周期（无限轮询）"), static_cast<int>(ca::ScheduleMode::Infinite));
+    schedModeCombo_->addItem(QStringLiteral("指定次数（轮询）"), static_cast<int>(ca::ScheduleMode::Counted));
 
-    schedIntervalSpin_ = new QSpinBox(side);
-    schedIntervalSpin_->setRange(0, 3600000);
-    schedIntervalSpin_->setValue(1000);
-    schedIntervalSpin_->setSuffix(QStringLiteral(" ms"));
-    sideLay->addWidget(schedIntervalSpin_);
+    // QSplitter 拉伸系数 Designer 不便表达；其余布局 stretch 已写在 .ui
+    ui_.panesSplitter->setStretchFactor(0, 3);
+    ui_.panesSplitter->setStretchFactor(1, 2);
+}
 
-    schedCountSpin_ = new QSpinBox(side);
-    schedCountSpin_->setRange(1, 1000000);
-    schedCountSpin_->setValue(10);
-    schedCountSpin_->setPrefix(QStringLiteral("次数 "));
-    sideLay->addWidget(schedCountSpin_);
-
-    btnSchedStart_ = new QPushButton(QStringLiteral("启动调度"), side);
-    btnSchedStart_->setObjectName(QStringLiteral("SecondaryButton"));
-    sideLay->addWidget(btnSchedStart_);
-    btnSchedPause_ = new QPushButton(QStringLiteral("暂停"), side);
-    btnSchedPause_->setObjectName(QStringLiteral("SecondaryButton"));
-    sideLay->addWidget(btnSchedPause_);
-    btnSchedResume_ = new QPushButton(QStringLiteral("继续"), side);
-    btnSchedResume_->setObjectName(QStringLiteral("SecondaryButton"));
-    sideLay->addWidget(btnSchedResume_);
-    btnSchedStop_ = new QPushButton(QStringLiteral("停止调度"), side);
-    btnSchedStop_->setObjectName(QStringLiteral("SecondaryButton"));
-    sideLay->addWidget(btnSchedStop_);
-
-    btnClear_ = new QPushButton(QStringLiteral("清空数据"), side);
-    btnClear_->setObjectName(QStringLiteral("GhostButton"));
-    sideLay->addWidget(btnClear_);
-    sideLay->addStretch(1);
-    sideScroll->setWidget(side);
-
-    auto* main = new QWidget(central);
-    main->setObjectName(QStringLiteral("MainPanel"));
-    auto* mainLay = new QVBoxLayout(main);
-    mainLay->setContentsMargins(16, 16, 16, 12);
-    mainLay->setSpacing(10);
-
-    log_ = new QPlainTextEdit(main);
-    log_->setObjectName(QStringLiteral("LogView"));
-    log_->setReadOnly(true);
-    mainLay->addWidget(log_, 1);
-
-    auto* sendRow = new QHBoxLayout();
-    sendEdit_ = new QPlainTextEdit(main);
-    sendEdit_->setObjectName(QStringLiteral("SendEdit"));
-    sendEdit_->setPlaceholderText(QStringLiteral("Native：HEX/文本；Legacy：数值 CSV 或透明文本"));
-    sendEdit_->setMaximumHeight(72);
-    btnSend_ = new QPushButton(QStringLiteral("➤"), main);
-    btnSend_->setObjectName(QStringLiteral("SendButton"));
-    btnSend_->setToolTip(QStringLiteral("发送"));
-    sendRow->addWidget(sendEdit_, 1);
-    sendRow->addWidget(btnSend_);
-    mainLay->addLayout(sendRow);
-
-    auto* footer = new QHBoxLayout();
-    txCountLabel_ = new QLabel(QStringLiteral("发送：0"), main);
-    txCountLabel_->setObjectName(QStringLiteral("FooterStat"));
-    rxCountLabel_ = new QLabel(QStringLiteral("接收：0 - 0"), main);
-    rxCountLabel_->setObjectName(QStringLiteral("FooterStat"));
-    btnResetCount_ = new QPushButton(QStringLiteral("复位计数"), main);
-    btnResetCount_->setObjectName(QStringLiteral("GhostButton"));
-    footer->addWidget(txCountLabel_);
-    footer->addSpacing(16);
-    footer->addWidget(rxCountLabel_);
-    footer->addStretch(1);
-    footer->addWidget(btnResetCount_);
-    mainLay->addLayout(footer);
-
-    root->addWidget(sideScroll);
-    root->addWidget(main, 1);
+void MainWindow::buildUi()
+{
+    ui_.setupUi(this);
+    bindUiWidgets();
+    populateDynamicUi();
 
     connect(workModeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onWorkModeChanged);
     connect(transportCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onTransportChanged);
     connect(legacyCommTypeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-            &MainWindow::onLegacyCommOrProtocolChanged);
+            &MainWindow::onLegacyCommTypeChanged);
     connect(legacyProtocolCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
-            &MainWindow::onLegacyCommOrProtocolChanged);
+            &MainWindow::onLegacyProtocolChanged);
     connect(btnOpen_, &QPushButton::clicked, this, &MainWindow::onOpenClicked);
     connect(btnSend_, &QPushButton::clicked, this, &MainWindow::onSendClicked);
     connect(btnClear_, &QPushButton::clicked, this, &MainWindow::onClearLogClicked);
@@ -546,7 +454,19 @@ void MainWindow::buildUi()
     connect(btnSchedPause_, &QPushButton::clicked, this, &MainWindow::onSchedPauseClicked);
     connect(btnSchedResume_, &QPushButton::clicked, this, &MainWindow::onSchedResumeClicked);
     connect(btnSchedStop_, &QPushButton::clicked, this, &MainWindow::onSchedStopClicked);
-    connect(schedModeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) { syncUi(); });
+    connect(btnListAdd_, &QPushButton::clicked, this, &MainWindow::onSendListAddRow);
+    connect(btnListRemove_, &QPushButton::clicked, this, &MainWindow::onSendListRemoveRows);
+    connect(btnListImport_, &QPushButton::clicked, this, &MainWindow::onSendListImport);
+    connect(btnListExport_, &QPushButton::clicked, this, &MainWindow::onSendListExport);
+    connect(btnListSendSelected_, &QPushButton::clicked, this, &MainWindow::onSendListSendSelected);
+    connect(schedModeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
+        updateSendPlaceholders();
+        syncUi();
+    });
+    connect(legacySendModeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+            [this](int) { updateSendPlaceholders(); });
+    connect(hexSendCheck_, &QCheckBox::toggled, this, [this](bool) { updateSendPlaceholders(); });
+    connect(hexDisplayCheck_, &QCheckBox::toggled, this, [this](bool) { syncUi(); });
     connect(clientCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) { syncUi(); });
     connect(btnResetCount_, &QPushButton::clicked, this, [this]() {
         txBytes_ = 0;
@@ -554,6 +474,8 @@ void MainWindow::buildUi()
         rxChunks_ = 0;
         updateCounters();
     });
+    addSendListRow(true, QStringLiteral("示例-力温"), QStringLiteral("12.3,45.6"), 1000, FormatValues);
+    updateSendPlaceholders();
 }
 
 void MainWindow::onWorkModeChanged(int)
@@ -561,15 +483,14 @@ void MainWindow::onWorkModeChanged(int)
     if (isLegacyMode()) {
         paramStack_->setCurrentIndex(4);
         transportCombo_->setVisible(false);
-        hexSendCheck_->setChecked(false);
         scheduler_.setSession(&legacySession_);
     } else {
         paramStack_->setCurrentIndex(transportCombo_->currentIndex());
         transportCombo_->setVisible(true);
-        hexSendCheck_->setChecked(true);
         scheduler_.setSession(&session_);
     }
     refreshLegacyCapabilityTips();
+    updateSendPlaceholders();
     syncUi();
 }
 
@@ -580,19 +501,31 @@ void MainWindow::onTransportChanged(int index)
     syncUi();
 }
 
-void MainWindow::onLegacyCommOrProtocolChanged()
+void MainWindow::onLegacyCommTypeChanged()
 {
     const int comm = legacyCommTypeCombo_->currentData().toInt();
     legacyEndpointStack_->setCurrentIndex(comm == 1 ? 1 : 0);
     const int prevProto = legacyProtocolCombo_->currentData().toInt();
-    if (comm == 1)
-        fillSerialProtocols(legacyProtocolCombo_);
-    else
-        fillNetworkProtocols(legacyProtocolCombo_);
-    const int idx = legacyProtocolCombo_->findData(prevProto);
-    if (idx >= 0)
-        legacyProtocolCombo_->setCurrentIndex(idx);
+    {
+        // clear/addItem 会触发 currentIndexChanged；阻断后避免重入栈溢出
+        const QSignalBlocker blocker(legacyProtocolCombo_);
+        if (comm == 1)
+            fillSerialProtocols(legacyProtocolCombo_);
+        else
+            fillNetworkProtocols(legacyProtocolCombo_);
+        const int idx = legacyProtocolCombo_->findData(prevProto);
+        if (idx >= 0)
+            legacyProtocolCombo_->setCurrentIndex(idx);
+    }
     refreshLegacyCapabilityTips();
+    updateSendPlaceholders();
+    syncUi();
+}
+
+void MainWindow::onLegacyProtocolChanged()
+{
+    refreshLegacyCapabilityTips();
+    updateSendPlaceholders();
     syncUi();
 }
 
@@ -616,14 +549,64 @@ void MainWindow::refreshLegacyCapabilityTips()
     const QString lim = profile.entries.value(static_cast<int>(ca::LegacyCapability::SendEncodedValues)).limitation;
     if (!lim.isEmpty())
         tips << lim;
+    if (!profile.supports(ca::LegacyCapability::SendEncodedValues)
+        && !profile.supports(ca::LegacyCapability::SendTransparentText))
+        tips << QStringLiteral("本协议库无业务发送路径（点发送会写日志说明）");
+    tips << QStringLiteral("不支持原始HEX（用Native）");
     legacyCapTipLabel_->setText(tips.join(QStringLiteral(" · ")));
+}
+
+void MainWindow::updateSendPlaceholders()
+{
+    if (!sendEdit_)
+        return;
+    if (!isLegacyMode()) {
+        sendEdit_->setPlaceholderText(
+            preferHexSend() ? QStringLiteral("Native HEX：如 3D 0D；列表「格式」选自动时跟勾选一致")
+                            : QStringLiteral("Native 文本：按 UTF-8 原样发送；列表「格式」选自动时跟勾选一致"));
+        return;
+    }
+    const int mode = schedModeCombo_ ? schedModeCombo_->currentData().toInt() : 0;
+    const bool list = (mode == static_cast<int>(ca::ScheduleMode::RoundRobin));
+    if (list) {
+        sendEdit_->setPlaceholderText(
+            QStringLiteral("Legacy 列表轮询：每行一组。数值例：12.3,45.6\n文本协议可发普通字符串。不要填 3D 0D 这类原始HEX"));
+    } else {
+        sendEdit_->setPlaceholderText(
+            QStringLiteral("Legacy：数值 CSV 如 12.3,45.6；或透明文本。多组请用「列表轮询」并每行一组。不要填原始HEX"));
+    }
 }
 
 void MainWindow::appendLog(const QString& line, const QString& cssClass)
 {
     Q_UNUSED(cssClass);
+    if (!log_)
+        return;
     const QString stamped = QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss ")) + line;
     log_->appendPlainText(stamped);
+}
+
+void MainWindow::appendData(const QString& line)
+{
+    if (!dataView_)
+        return;
+    const QString stamped = QDateTime::currentDateTime().toString(QStringLiteral("hh:mm:ss ")) + line;
+    dataView_->appendPlainText(stamped);
+}
+
+QString MainWindow::sessionStateTip(ca::SessionState state)
+{
+    switch (state) {
+    case ca::SessionState::Created: return QStringLiteral("会话已创建");
+    case ca::SessionState::Opening: return QStringLiteral("正在连接…");
+    case ca::SessionState::Connected: return QStringLiteral("已连接");
+    case ca::SessionState::Closing: return QStringLiteral("正在关闭…");
+    case ca::SessionState::Closed: return QStringLiteral("连接已关闭");
+    case ca::SessionState::Reconnecting: return QStringLiteral("正在重连…");
+    case ca::SessionState::Unresponsive: return QStringLiteral("会话无响应（禁止新命令，请重启应用）");
+    case ca::SessionState::Faulted: return QStringLiteral("连接故障（数据/链路可能已中断）");
+    }
+    return QStringLiteral("未知状态");
 }
 
 void MainWindow::updateCounters()
@@ -672,36 +655,51 @@ void MainWindow::syncUi()
     transportCombo_->setEnabled(canConfig && !legacy);
     paramStack_->setEnabled(canConfig);
 
-    bool canSend = connected;
-    if (legacy && connected) {
-        const ca::LegacyCapabilityProfile& p = legacySession_.capabilityProfile();
-        canSend = p.supports(ca::LegacyCapability::SendEncodedValues)
-                  || p.supports(ca::LegacyCapability::SendTransparentText);
+    // 收发相关选择区不按协议/连接锁死；不可用时在点击后写日志提示
+    const bool uiAlive = (st != ca::SessionState::Unresponsive);
+    if (btnSend_)
+        btnSend_->setEnabled(uiAlive);
+    if (hexSendCheck_) {
+        hexSendCheck_->setEnabled(uiAlive && !legacy);
+        hexSendCheck_->setVisible(!legacy);
     }
-    btnSend_->setEnabled(canSend);
-    if (hexSendCheck_)
-        hexSendCheck_->setEnabled(!legacy);
     if (hexDisplayCheck_)
-        hexDisplayCheck_->setEnabled(!legacy);
+        hexDisplayCheck_->setEnabled(uiAlive);
+    if (legacySendModeCombo_) {
+        legacySendModeCombo_->setEnabled(uiAlive && legacy);
+        legacySendModeCombo_->setVisible(legacy);
+    }
+    if (ui_.sendSideHint)
+        ui_.sendSideHint->setVisible(true);
 
     const bool schedActive = !activeSchedTaskId_.isNull() && scheduler_.hasTask(activeSchedTaskId_);
     const bool schedPaused = schedActive && scheduler_.isPaused(activeSchedTaskId_);
-    const int mode = schedModeCombo_ ? schedModeCombo_->currentData().toInt() : 0;
     if (schedCountSpin_)
-        schedCountSpin_->setEnabled(mode == static_cast<int>(ca::ScheduleMode::Counted)
-                                    || mode == static_cast<int>(ca::ScheduleMode::RoundRobin));
+        schedCountSpin_->setEnabled(uiAlive);
     if (schedIntervalSpin_)
-        schedIntervalSpin_->setEnabled(mode != static_cast<int>(ca::ScheduleMode::Once));
-    if (btnSchedStart_)
-        btnSchedStart_->setEnabled(canSend && !schedActive);
-    if (btnSchedPause_)
-        btnSchedPause_->setEnabled(connected && schedActive && !schedPaused);
-    if (btnSchedResume_)
-        btnSchedResume_->setEnabled(connected && schedActive && schedPaused);
-    if (btnSchedStop_)
-        btnSchedStop_->setEnabled(schedActive);
+        schedIntervalSpin_->setEnabled(uiAlive);
     if (schedModeCombo_)
-        schedModeCombo_->setEnabled(connected && !schedActive);
+        schedModeCombo_->setEnabled(uiAlive);
+    if (btnSchedStart_)
+        btnSchedStart_->setEnabled(uiAlive);
+    if (btnSchedPause_)
+        btnSchedPause_->setEnabled(uiAlive && schedActive && !schedPaused);
+    if (btnSchedResume_)
+        btnSchedResume_->setEnabled(uiAlive && schedActive && schedPaused);
+    if (btnSchedStop_)
+        btnSchedStop_->setEnabled(uiAlive && schedActive);
+    if (btnListAdd_)
+        btnListAdd_->setEnabled(uiAlive);
+    if (btnListRemove_)
+        btnListRemove_->setEnabled(uiAlive);
+    if (btnListImport_)
+        btnListImport_->setEnabled(uiAlive);
+    if (btnListExport_)
+        btnListExport_->setEnabled(uiAlive);
+    if (btnListSendSelected_)
+        btnListSendSelected_->setEnabled(uiAlive);
+    if (sendListTable_)
+        sendListTable_->setEnabled(uiAlive);
 
     if (clientSectionLabel_)
         clientSectionLabel_->setVisible(showClients);
@@ -801,7 +799,7 @@ ca::SessionConfig MainWindow::buildConfig() const
 QByteArray MainWindow::buildPayload(QString* error) const
 {
     const QString text = sendEdit_->toPlainText();
-    if (hexSendCheck_->isChecked())
+    if (preferHexSend())
         return ca::parseHexPayloadStrict(text, error);
     const QByteArray utf8 = text.toUtf8();
     if (utf8.isEmpty() && session_.activeTransportKind() != ca::TransportKind::Udp && error)
@@ -811,48 +809,160 @@ QByteArray MainWindow::buildPayload(QString* error) const
 
 ca::Result MainWindow::buildLegacySendRequest(ca::SendRequest* req, QString* error) const
 {
+    const QString text = sendEdit_ ? sendEdit_->toPlainText().trimmed() : QString();
+    const int format = legacySendModeCombo_ ? legacySendModeCombo_->currentData().toInt() : FormatAuto;
+    return buildLegacySendRequestFrom(text, format, req, error);
+}
+
+ca::Result MainWindow::buildLegacySendRequestFrom(const QString& textIn, int format, ca::SendRequest* req,
+                                                  QString* error) const
+{
     if (!req)
         return ca::Result::fail(QStringLiteral("null"), QStringLiteral("内部错误"));
     const ca::LegacyCapabilityProfile& p = legacySession_.capabilityProfile();
-    const QString text = sendEdit_->toPlainText().trimmed();
+    const QString text = textIn.trimmed();
     if (text.isEmpty()) {
         if (error)
             *error = QStringLiteral("发送内容为空");
         return ca::Result::fail(QStringLiteral("empty"), QStringLiteral("发送内容为空"));
     }
 
+    if (format == FormatHex || (preferHexSend() && format == FormatAuto)) {
+        if (error) {
+            *error = QStringLiteral(
+                "兼容模式不支持原始 HEX 发送（库无 RawSend）。请用数值 CSV 或透明文本；原始字节请用 Native");
+        }
+        return ca::Result::fail(QStringLiteral("legacy_no_raw"), QStringLiteral("Legacy 不支持原始 HEX"));
+    }
+
+    const bool canValues = p.supports(ca::LegacyCapability::SendEncodedValues);
+    const bool canText = p.supports(ca::LegacyCapability::SendTransparentText);
+    if (!canValues && !canText) {
+        if (error)
+            *error = QStringLiteral("当前协议在库中无业务发送路径（发数值✗ 发文本✗），无法发送");
+        return ca::Result::fail(QStringLiteral("capability_denied"), QStringLiteral("当前协议不支持发送"));
+    }
+
+    const bool forceValues = (format == FormatValues);
+    const bool forceText = (format == FormatText);
+    const bool preferValues = (format == FormatAuto && canValues) || forceValues;
+
     req->requestId = QUuid::createUuid();
     req->sessionId = legacySession_.sessionId();
 
-    if (p.supports(ca::LegacyCapability::SendEncodedValues)
-        && (!p.supports(ca::LegacyCapability::SendTransparentText) || text.contains(QLatin1Char(','))
-            || text.contains(QRegularExpression(QStringLiteral("^\\s*-?\\d"))))) {
-        QVariantList vals;
+    auto parseValues = [&](QVariantList* vals, QString* badToken) -> bool {
+        vals->clear();
         const QStringList parts = text.split(QRegularExpression(QStringLiteral("[,\\s]+")), Qt::SkipEmptyParts);
+        if (parts.isEmpty())
+            return false;
         for (const QString& part : parts) {
             bool ok = false;
             const double d = part.toDouble(&ok);
             if (!ok) {
-                if (error)
-                    *error = QStringLiteral("数值解析失败：%1").arg(part);
-                return ca::Result::fail(QStringLiteral("parse"), QStringLiteral("数值解析失败"));
+                if (badToken)
+                    *badToken = part;
+                return false;
             }
-            vals << d;
+            *vals << d;
         }
-        req->attributes.insert(QStringLiteral("legacySend"), QStringLiteral("values"));
-        req->attributes.insert(QStringLiteral("values"), vals);
+        return true;
+    };
+
+    if (forceText) {
+        if (!canText) {
+            if (error)
+                *error = QStringLiteral("当前协议不支持透明文本发送（请改用数值CSV或换协议）");
+            return ca::Result::fail(QStringLiteral("capability_denied"), QStringLiteral("不支持文本发送"));
+        }
+        req->attributes.insert(QStringLiteral("legacySend"), QStringLiteral("text"));
         req->payload = text.toUtf8();
         return ca::Result::success();
     }
 
-    if (!p.supports(ca::LegacyCapability::SendTransparentText)) {
-        if (error)
-            *error = QStringLiteral("当前协议不支持发送");
-        return ca::Result::fail(QStringLiteral("capability_denied"), QStringLiteral("当前协议不支持发送"));
+    if (preferValues) {
+        QVariantList vals;
+        QString bad;
+        if (parseValues(&vals, &bad)) {
+            const QString lim =
+                p.entries.value(static_cast<int>(ca::LegacyCapability::SendEncodedValues)).limitation;
+            if (lim.contains(QStringLiteral("5")) && vals.size() < 5) {
+                if (error)
+                    *error = QStringLiteral("本协议数值发送至少需要 5 个数值，当前 %1 个").arg(vals.size());
+                return ca::Result::fail(QStringLiteral("invalid_value_count"), QStringLiteral("数值个数不足"));
+            }
+            if (lim.contains(QStringLiteral("2")) && vals.size() < 2) {
+                if (error)
+                    *error = QStringLiteral("本协议数值发送至少需要 2 个数值（如力,温），当前 %1 个")
+                                 .arg(vals.size());
+                return ca::Result::fail(QStringLiteral("invalid_value_count"), QStringLiteral("数值个数不足"));
+            }
+            req->attributes.insert(QStringLiteral("legacySend"), QStringLiteral("values"));
+            req->attributes.insert(QStringLiteral("values"), vals);
+            req->payload = text.toUtf8();
+            return ca::Result::success();
+        }
+        if (forceValues) {
+            if (error)
+                *error = QStringLiteral("数值解析失败：%1（请用逗号分隔的十进制数）").arg(bad);
+            return ca::Result::fail(QStringLiteral("parse"), QStringLiteral("数值解析失败"));
+        }
     }
-    req->attributes.insert(QStringLiteral("legacySend"), QStringLiteral("text"));
-    req->payload = text.toUtf8();
-    return ca::Result::success();
+
+    if (canText) {
+        req->attributes.insert(QStringLiteral("legacySend"), QStringLiteral("text"));
+        req->payload = text.toUtf8();
+        return ca::Result::success();
+    }
+
+    if (error)
+        *error = QStringLiteral("无法解析为数值，且本协议不支持文本发送");
+    return ca::Result::fail(QStringLiteral("parse"), QStringLiteral("载荷无法按协议发送"));
+}
+
+QString MainWindow::formatRecordForDisplay(const ca::CommRecord& record) const
+{
+    QString body = record.summary;
+    if (!record.bytes.isEmpty()) {
+        if (preferHexDisplay())
+            body += QStringLiteral(" | HEX ") + QString::fromLatin1(record.bytes.toHex(' '));
+        else
+            body += QStringLiteral(" | TXT ") + QString::fromUtf8(record.bytes);
+    }
+    if (record.kind == ca::RecordKind::LegacyValueEvent) {
+        const QVariantList vals = record.attributes.value(QStringLiteral("values")).toList();
+        if (!vals.isEmpty()) {
+            QStringList parts;
+            for (const QVariant& v : vals)
+                parts << QString::number(v.toDouble(), 'g', 12);
+            body += QStringLiteral(" | VALUES ") + parts.join(QLatin1Char(','));
+        }
+        const int legacyType = record.attributes.value(QStringLiteral("legacyType")).toInt();
+        body += QStringLiteral(" | type=%1").arg(legacyType);
+    }
+    if (record.kind == ca::RecordKind::LegacyControlEvent
+        || record.kind == ca::RecordKind::LegacyParameterEvent) {
+        const QString msgName = record.attributes.value(QStringLiteral("msgName")).toString();
+        const int ctrlCmd = record.attributes.value(QStringLiteral("ctrlCmd")).toInt();
+        const int viewId = record.attributes.value(QStringLiteral("viewId")).toInt();
+        const int msg = record.attributes.value(QStringLiteral("msg")).toInt();
+        if (!msgName.isEmpty())
+            body = QStringLiteral("指令[%1] ctrlCmd=%2 viewId=%3 msg=%4(0x%5)")
+                       .arg(msgName)
+                       .arg(ctrlCmd)
+                       .arg(viewId)
+                       .arg(msg)
+                       .arg(msg, 0, 16);
+        if (record.kind == ca::RecordKind::LegacyParameterEvent) {
+            const QVariantMap extra = record.attributes.value(QStringLiteral("extra")).toMap();
+            if (!extra.isEmpty())
+                body += QStringLiteral(" | extra键数=%1").arg(extra.size());
+        }
+    }
+    const QString dir = (record.direction == ca::Direction::Tx)   ? QStringLiteral("TX")
+                        : (record.direction == ca::Direction::Rx) ? QStringLiteral("RX")
+                                                                  : QStringLiteral("SYS");
+    return QStringLiteral("[%1][%2][%3] %4")
+        .arg(dir, ca::recordKindName(record.kind), ca::recordStatusName(record.status), body);
 }
 
 void MainWindow::onOpenClicked()
@@ -938,71 +1048,32 @@ void MainWindow::fillChannelOnRequest(ca::SendRequest* req) const
 QVector<QByteArray> MainWindow::buildSchedulePayloads(QString* error) const
 {
     QVector<QByteArray> out;
-    if (isLegacyMode()) {
-        // Legacy 调度：整框作为一条载荷（数值 CSV 或文本）
-        const QString text = sendEdit_->toPlainText().trimmed();
-        if (text.isEmpty()) {
-            if (error)
-                *error = QStringLiteral("发送内容为空");
-            return out;
-        }
-        out.push_back(text.toUtf8());
-        return out;
-    }
-
-    const QString text = sendEdit_->toPlainText();
-    const QStringList lines = text.split(QRegularExpression(QStringLiteral("[\r\n]+")), Qt::SkipEmptyParts);
-    const int mode = schedModeCombo_->currentData().toInt();
-    const bool roundRobin = (mode == static_cast<int>(ca::ScheduleMode::RoundRobin));
-
-    if (!roundRobin) {
-        QString err;
-        const QByteArray one = buildPayload(&err);
-        const bool allowEmptyUdp = (session_.activeTransportKind() == ca::TransportKind::Udp);
-        if (one.isEmpty() && (!allowEmptyUdp || !err.isEmpty())) {
-            if (error)
-                *error = err.isEmpty() ? QStringLiteral("发送内容为空") : err;
-            return out;
-        }
-        out.push_back(one);
-        return out;
-    }
-
-    if (lines.isEmpty()) {
-        if (error)
-            *error = QStringLiteral("轮询模式需要至少一行载荷");
-        return out;
-    }
-    for (const QString& line : lines) {
-        QString err;
-        QByteArray bytes;
-        if (hexSendCheck_->isChecked())
-            bytes = ca::parseHexPayloadStrict(line, &err);
-        else
-            bytes = line.toUtf8();
-        if (!err.isEmpty() || (bytes.isEmpty() && session_.activeTransportKind() != ca::TransportKind::Udp)) {
-            if (error)
-                *error = err.isEmpty() ? QStringLiteral("轮询行载荷无效") : err;
-            return QVector<QByteArray>();
-        }
-        out.push_back(bytes);
-    }
+    QVector<int> formats;
+    if (!collectEnabledListPayloads(&out, &formats, error))
+        return QVector<QByteArray>();
     return out;
 }
 
 void MainWindow::onSendClicked()
 {
+    if (activeSession()->state() != ca::SessionState::Connected) {
+        appendLog(QStringLiteral("[边界] 发送拒绝：会话未连接（请先打开连接）"));
+        return;
+    }
+
     if (isLegacyMode()) {
         ca::SendRequest req;
         QString err;
         const ca::Result built = buildLegacySendRequest(&req, &err);
         if (!built.ok) {
-            appendLog(QStringLiteral("发送失败：%1").arg(err.isEmpty() ? built.message : err));
+            appendLog(QStringLiteral("[边界] 发送拒绝：%1").arg(err.isEmpty() ? built.message : err));
             return;
         }
         const ca::Result r = legacySession_.send(req);
         if (!r.ok)
-            appendLog(QStringLiteral("发送失败：%1").arg(r.message));
+            appendLog(QStringLiteral("[异常] 发送失败：%1").arg(r.message));
+        else
+            appendData(QStringLiteral("[TX][Pending] %1").arg(QString::fromUtf8(req.payload)));
         return;
     }
 
@@ -1010,7 +1081,7 @@ void MainWindow::onSendClicked()
     const QByteArray payload = buildPayload(&err);
     const bool allowEmptyUdp = (session_.activeTransportKind() == ca::TransportKind::Udp);
     if (payload.isEmpty() && (!allowEmptyUdp || !err.isEmpty())) {
-        appendLog(QStringLiteral("发送失败：%1").arg(err.isEmpty() ? QStringLiteral("发送内容为空") : err));
+        appendLog(QStringLiteral("[边界] 发送拒绝：%1").arg(err.isEmpty() ? QStringLiteral("发送内容为空") : err));
         return;
     }
     ca::SendRequest req;
@@ -1021,36 +1092,120 @@ void MainWindow::onSendClicked()
 
     const ca::Result r = session_.send(req);
     if (!r.ok)
-        appendLog(QStringLiteral("发送失败：%1").arg(r.message));
+        appendLog(QStringLiteral("[异常] 发送失败：%1").arg(r.message));
 }
 
 void MainWindow::onSchedStartClicked()
 {
     if (activeSession()->state() != ca::SessionState::Connected) {
-        appendLog(QStringLiteral("调度失败：会话未连接"));
+        appendLog(QStringLiteral("[边界] 调度拒绝：会话未连接（请先打开连接）"));
         return;
     }
-    QString err;
-    const QVector<QByteArray> payloads = buildSchedulePayloads(&err);
-    if (payloads.isEmpty()) {
-        appendLog(QStringLiteral("调度失败：%1").arg(err));
+    if (!activeSchedTaskId_.isNull() && scheduler_.hasTask(activeSchedTaskId_)) {
+        appendLog(QStringLiteral("[边界] 调度拒绝：已有任务在跑，请先停止调度"));
         return;
     }
 
+    QVector<QByteArray> payloads;
+    QVector<int> formats;
+    QVector<int> intervals;
+    QVector<QVariantMap> attrs;
+    QString err;
+    if (!sendListTable_ || sendListTable_->rowCount() == 0) {
+        appendLog(QStringLiteral("[边界] 调度拒绝：发送列表为空，请添加行或导入 txt/csv"));
+        return;
+    }
+
+    for (int r = 0; r < sendListTable_->rowCount(); ++r) {
+        QTableWidgetItem* enItem = sendListTable_->item(r, 0);
+        if (!enItem || enItem->checkState() != Qt::Checked)
+            continue;
+        const QString payload = sendListTable_->item(r, 2)
+                                    ? sendListTable_->item(r, 2)->text().trimmed()
+                                    : QString();
+        if (payload.isEmpty()) {
+            appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行载荷为空").arg(r + 1));
+            return;
+        }
+        int intervalMs = schedIntervalSpin_ ? schedIntervalSpin_->value() : 1000;
+        if (sendListTable_->item(r, 3)) {
+            bool ok = false;
+            const int v = sendListTable_->item(r, 3)->text().toInt(&ok);
+            if (ok && v >= 0)
+                intervalMs = v;
+        }
+        int format = FormatAuto;
+        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 4)))
+            format = combo->currentData().toInt();
+
+        if (isLegacyMode()) {
+            ca::SendRequest probe;
+            QString e;
+            const ca::Result built = buildLegacySendRequestFrom(payload, format, &probe, &e);
+            if (!built.ok) {
+                appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行 — %2").arg(r + 1).arg(e.isEmpty() ? built.message : e));
+                return;
+            }
+            payloads.push_back(probe.payload);
+            attrs.push_back(probe.attributes);
+            intervals.push_back(intervalMs);
+            formats.push_back(format);
+        } else {
+            QByteArray bytes;
+            if (format == FormatHex || (format == FormatAuto && preferHexSend())) {
+                QString e;
+                bytes = ca::parseHexPayloadStrict(payload, &e);
+                if (!e.isEmpty()) {
+                    appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行 HEX — %2").arg(r + 1).arg(e));
+                    return;
+                }
+            } else {
+                bytes = payload.toUtf8();
+            }
+            payloads.push_back(bytes);
+            attrs.push_back(QVariantMap());
+            intervals.push_back(intervalMs);
+            formats.push_back(format);
+        }
+    }
+
+    if (payloads.isEmpty()) {
+        appendLog(QStringLiteral("[边界] 调度拒绝：没有勾选启用的列表行"));
+        return;
+    }
+    Q_UNUSED(formats);
+    Q_UNUSED(err);
+
     ca::ScheduleTaskSpec spec;
-    spec.mode = static_cast<ca::ScheduleMode>(schedModeCombo_->currentData().toInt());
-    spec.payloads = payloads;
-    spec.intervalMs = schedIntervalSpin_->value();
+    const ca::ScheduleMode userMode =
+        static_cast<ca::ScheduleMode>(schedModeCombo_->currentData().toInt());
+    spec.mode = userMode;
     spec.maxCount = schedCountSpin_->value();
+    if (payloads.size() > 1) {
+        if (userMode == ca::ScheduleMode::Once) {
+            appendLog(QStringLiteral("提示：调度为「单次」但列表有多行，将只发送第一组启用行"));
+            payloads.resize(1);
+            attrs.resize(1);
+            intervals.resize(1);
+        } else {
+            spec.mode = ca::ScheduleMode::RoundRobin;
+            if (userMode == ca::ScheduleMode::Infinite)
+                spec.maxCount = 0; // RoundRobin 下 0 = 无限
+        }
+    }
+
+    spec.payloads = payloads;
+    spec.payloadAttributes = attrs;
+    spec.payloadIntervals = intervals;
+    spec.intervalMs = schedIntervalSpin_->value();
     if (!isLegacyMode() && session_.activeTransportKind() == ca::TransportKind::TcpServer && clientCombo_) {
         spec.channelId = clientCombo_->currentData().toString();
         spec.broadcast = spec.channelId.isEmpty();
     }
-    if (isLegacyMode()) {
-        // SendScheduler 只填 payload；LegacySession::send 需 attributes — 用文本路径或 CSV
-        // 在 Legacy 侧：scheduler 发出的 SendRequest 仅有 payload；validate 将按 values/text 推断
-        appendLog(QStringLiteral("提示：Legacy 调度按 payload 推断数值 CSV 或文本"));
-    }
+
+    appendLog(QStringLiteral("提示：发送列表调度共 %1 组").arg(payloads.size()));
+    for (int i = 0; i < payloads.size(); ++i)
+        appendData(QStringLiteral("[TX][Sched#%1] %2").arg(i + 1).arg(QString::fromUtf8(payloads.at(i))));
 
     scheduler_.stopAll();
     spec.taskId = QUuid::createUuid();
@@ -1058,11 +1213,11 @@ void MainWindow::onSchedStartClicked()
     const ca::Result r = scheduler_.startTask(spec);
     if (!r.ok) {
         activeSchedTaskId_ = QUuid();
-        appendLog(QStringLiteral("调度启动失败：%1").arg(r.message));
+        appendLog(QStringLiteral("[异常] 调度启动失败：%1").arg(r.message));
         syncUi();
         return;
     }
-    appendLog(QStringLiteral("调度已启动"));
+    appendLog(QStringLiteral("[连接] 调度已启动"));
     syncUi();
 }
 
@@ -1111,42 +1266,44 @@ void MainWindow::onSchedTaskFailed(const QUuid& taskId, const QString& code, con
 
 void MainWindow::onClearLogClicked()
 {
-    log_->clear();
+    if (log_)
+        log_->clear();
+    if (dataView_)
+        dataView_->clear();
 }
 
 void MainWindow::onRecordReceived(const ca::CommRecord& record)
 {
     const ca::Result cap = capture_.enqueue(record);
     if (!cap.ok && cap.code == QStringLiteral("capture_queue_full"))
-        appendLog(QStringLiteral("抓包队列满：%1").arg(cap.message));
+        appendLog(QStringLiteral("[异常] 抓包队列满：%1").arg(cap.message));
 
-    QString body = record.summary;
-    if (!record.bytes.isEmpty()) {
-        if (hexDisplayCheck_->isChecked())
-            body += QStringLiteral(" | ") + QString::fromLatin1(record.bytes.toHex(' '));
-        else
-            body += QStringLiteral(" | ") + QString::fromUtf8(record.bytes);
-    }
-    if (record.kind == ca::RecordKind::LegacyValueEvent) {
-        const QVariantList vals = record.attributes.value(QStringLiteral("values")).toList();
-        if (!vals.isEmpty()) {
-            QStringList parts;
-            for (const QVariant& v : vals)
-                parts << QString::number(v.toDouble());
-            body += QStringLiteral(" | ") + parts.join(QLatin1Char(','));
-        }
-    }
-    appendLog(QStringLiteral("[%1][%2] %3")
-                  .arg(ca::recordKindName(record.kind), ca::recordStatusName(record.status), body));
+    const QString line = formatRecordForDisplay(record);
 
-    const bool isData = (record.kind == ca::RecordKind::RawChunk
-                         || record.kind == ca::RecordKind::UdpDatagram);
-    if (isData && record.direction == ca::Direction::Tx
+    // 指令与测数、收发载荷均进数据区，便于核对；连接/异常仍进日志
+    const bool toData = (record.kind == ca::RecordKind::RawChunk
+                         || record.kind == ca::RecordKind::UdpDatagram
+                         || record.kind == ca::RecordKind::LegacyValueEvent
+                         || record.kind == ca::RecordKind::LegacyControlEvent
+                         || record.kind == ca::RecordKind::LegacyParameterEvent);
+    if (toData)
+        appendData(line);
+
+    if (record.kind == ca::RecordKind::ErrorEvent)
+        appendLog(QStringLiteral("[异常] %1").arg(line));
+    else if (record.kind == ca::RecordKind::ConnectionEvent)
+        appendLog(QStringLiteral("[连接] %1").arg(line));
+    else if (!toData)
+        appendLog(line);
+
+    const bool isRaw = (record.kind == ca::RecordKind::RawChunk
+                        || record.kind == ca::RecordKind::UdpDatagram);
+    if (isRaw && record.direction == ca::Direction::Tx
         && record.status == ca::RecordStatus::Submitted) {
         txBytes_ += static_cast<quint64>(record.bytes.size());
         updateCounters();
     }
-    if (isData && record.direction == ca::Direction::Rx) {
+    if (isRaw && record.direction == ca::Direction::Rx) {
         rxBytes_ += static_cast<quint64>(record.bytes.size());
         ++rxChunks_;
         updateCounters();
@@ -1160,10 +1317,32 @@ void MainWindow::onRecordReceived(const ca::CommRecord& record)
         ++txBytes_;
         updateCounters();
     }
+    if ((record.kind == ca::RecordKind::LegacyControlEvent
+         || record.kind == ca::RecordKind::LegacyParameterEvent)
+        && record.direction == ca::Direction::Rx) {
+        ++rxChunks_;
+        updateCounters();
+    }
 }
 
 void MainWindow::onSessionStateChanged(ca::SessionState state)
 {
+    if (state != lastSessionState_) {
+        const bool wasUp = (lastSessionState_ == ca::SessionState::Connected
+                            || lastSessionState_ == ca::SessionState::Opening);
+        if (state == ca::SessionState::Faulted)
+            appendLog(QStringLiteral("[断连] %1").arg(sessionStateTip(state)));
+        else if (state == ca::SessionState::Closed && wasUp)
+            appendLog(QStringLiteral("[断连] %1").arg(sessionStateTip(state)));
+        else if (state == ca::SessionState::Unresponsive)
+            appendLog(QStringLiteral("[异常] %1").arg(sessionStateTip(state)));
+        else if (state == ca::SessionState::Connected)
+            appendLog(QStringLiteral("[连接] %1").arg(sessionStateTip(state)));
+        else if (state == ca::SessionState::Opening || state == ca::SessionState::Closing)
+            appendLog(QStringLiteral("[连接] %1").arg(sessionStateTip(state)));
+        lastSessionState_ = state;
+    }
+
     if (state == ca::SessionState::Closed || state == ca::SessionState::Faulted
         || state == ca::SessionState::Unresponsive) {
         capture_.stopSession(session_.sessionId());
@@ -1172,16 +1351,21 @@ void MainWindow::onSessionStateChanged(ca::SessionState state)
     syncUi();
 }
 
+void MainWindow::onCommError(const ca::CommError& error)
+{
+    appendLog(QStringLiteral("[异常] %1（%2）").arg(error.message, error.code));
+}
+
 void MainWindow::onLegacyUnresponsive(const QString& message)
 {
-    appendLog(QStringLiteral("Legacy 不可响应：%1 — 请重启应用回收 Worker").arg(message));
+    appendLog(QStringLiteral("[异常] Legacy 不可响应：%1 — 请重启应用回收 Worker").arg(message));
     syncUi();
 }
 
 void MainWindow::onCaptureFailed(const QUuid& sessionId, const QString& code, const QString& message)
 {
     Q_UNUSED(sessionId);
-    appendLog(QStringLiteral("抓包错误：%1（%2）").arg(message, code));
+    appendLog(QStringLiteral("[异常] 抓包错误：%1（%2）").arg(message, code));
 }
 
 void MainWindow::onCaptureStarted(const QUuid& sessionId, const QString& filePath)
@@ -1203,7 +1387,7 @@ void MainWindow::onDisconnectClientClicked()
 
     const QString channelId = clientCombo_->currentData().toString();
     if (channelId.isEmpty()) {
-        appendLog(QStringLiteral("断开失败：请选择具体客户端，不可对广播项操作"));
+        appendLog(QStringLiteral("[边界] 断开拒绝：请选择具体客户端，不可对广播项操作"));
         return;
     }
 
@@ -1212,4 +1396,344 @@ void MainWindow::onDisconnectClientClicked()
         appendLog(QStringLiteral("已断开客户端：%1").arg(channelId));
     else
         appendLog(QStringLiteral("断开失败：%1").arg(r.message));
+}
+
+void MainWindow::ensureSendListHeaders()
+{
+    if (!sendListTable_)
+        return;
+    sendListTable_->setHorizontalHeaderLabels(
+        QStringList() << QStringLiteral("启用") << QStringLiteral("名称") << QStringLiteral("载荷")
+                      << QStringLiteral("延时ms") << QStringLiteral("格式"));
+}
+
+QString MainWindow::formatName(int format)
+{
+    switch (format) {
+    case FormatValues: return QStringLiteral("数值");
+    case FormatText: return QStringLiteral("文本");
+    case FormatHex: return QStringLiteral("HEX");
+    default: return QStringLiteral("自动");
+    }
+}
+
+int MainWindow::formatFromName(const QString& name)
+{
+    const QString n = name.trimmed();
+    if (n.contains(QStringLiteral("数值")) || n.compare(QStringLiteral("values"), Qt::CaseInsensitive) == 0)
+        return FormatValues;
+    if (n.contains(QStringLiteral("文本")) || n.compare(QStringLiteral("text"), Qt::CaseInsensitive) == 0)
+        return FormatText;
+    if (n.contains(QStringLiteral("HEX"), Qt::CaseInsensitive)
+        || n.compare(QStringLiteral("hex"), Qt::CaseInsensitive) == 0)
+        return FormatHex;
+    return FormatAuto;
+}
+
+void MainWindow::addSendListRow(bool enabled, const QString& name, const QString& payload, int intervalMs,
+                                int format)
+{
+    if (!sendListTable_)
+        return;
+    const int row = sendListTable_->rowCount();
+    sendListTable_->insertRow(row);
+
+    auto* en = new QTableWidgetItem;
+    en->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    en->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
+    sendListTable_->setItem(row, 0, en);
+    sendListTable_->setItem(row, 1, new QTableWidgetItem(name));
+    sendListTable_->setItem(row, 2, new QTableWidgetItem(payload));
+    sendListTable_->setItem(row, 3, new QTableWidgetItem(QString::number(intervalMs)));
+
+    auto* fmt = new QComboBox(sendListTable_);
+    fmt->addItem(QStringLiteral("自动"), FormatAuto);
+    fmt->addItem(QStringLiteral("数值"), FormatValues);
+    fmt->addItem(QStringLiteral("文本"), FormatText);
+    fmt->addItem(QStringLiteral("HEX"), FormatHex);
+    const int idx = fmt->findData(format);
+    fmt->setCurrentIndex(idx >= 0 ? idx : 0);
+    sendListTable_->setCellWidget(row, 4, fmt);
+}
+
+bool MainWindow::collectEnabledListPayloads(QVector<QByteArray>* outPayloads, QVector<int>* outFormats,
+                                           QString* error) const
+{
+    if (!outPayloads)
+        return false;
+    outPayloads->clear();
+    if (outFormats)
+        outFormats->clear();
+    if (!sendListTable_ || sendListTable_->rowCount() == 0) {
+        if (error)
+            *error = QStringLiteral("发送列表为空");
+        return false;
+    }
+    for (int r = 0; r < sendListTable_->rowCount(); ++r) {
+        QTableWidgetItem* enItem = sendListTable_->item(r, 0);
+        if (!enItem || enItem->checkState() != Qt::Checked)
+            continue;
+        const QString payload = sendListTable_->item(r, 2)
+                                    ? sendListTable_->item(r, 2)->text().trimmed()
+                                    : QString();
+        if (payload.isEmpty()) {
+            if (error)
+                *error = QStringLiteral("第 %1 行载荷为空").arg(r + 1);
+            return false;
+        }
+        int format = FormatAuto;
+        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 4)))
+            format = combo->currentData().toInt();
+        outPayloads->push_back(payload.toUtf8());
+        if (outFormats)
+            outFormats->push_back(format);
+    }
+    if (outPayloads->isEmpty()) {
+        if (error)
+            *error = QStringLiteral("没有勾选启用的列表行");
+        return false;
+    }
+    return true;
+}
+
+void MainWindow::onSendListAddRow()
+{
+    addSendListRow(true, QStringLiteral("条目%1").arg(sendListTable_->rowCount() + 1),
+                   QStringLiteral("0,0"), 1000, isLegacyMode() ? FormatValues : FormatAuto);
+}
+
+void MainWindow::onSendListRemoveRows()
+{
+    if (!sendListTable_)
+        return;
+    const auto ranges = sendListTable_->selectionModel()->selectedRows();
+    QList<int> rows;
+    for (const QModelIndex& idx : ranges)
+        rows.push_back(idx.row());
+    std::sort(rows.begin(), rows.end(), std::greater<int>());
+    for (int r : rows)
+        sendListTable_->removeRow(r);
+}
+
+void MainWindow::onSendListImport()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, QStringLiteral("导入发送列表"), QString(),
+        QStringLiteral("文本/CSV (*.txt *.csv);;所有文件 (*.*)"));
+    if (path.isEmpty())
+        return;
+    QString err;
+    if (!importSendListFile(path, &err)) {
+        appendLog(QStringLiteral("[边界] 导入失败：%1").arg(err));
+        return;
+    }
+    appendLog(QStringLiteral("[连接] 已导入发送列表：%1（共 %2 行）")
+                  .arg(path)
+                  .arg(sendListTable_->rowCount()));
+}
+
+void MainWindow::onSendListExport()
+{
+    const QString path = QFileDialog::getSaveFileName(
+        this, QStringLiteral("导出发送列表"), QStringLiteral("send-list.csv"),
+        QStringLiteral("CSV (*.csv);;文本 (*.txt)"));
+    if (path.isEmpty())
+        return;
+    QString err;
+    if (!exportSendListFile(path, &err)) {
+        appendLog(QStringLiteral("[边界] 导出失败：%1").arg(err));
+        return;
+    }
+    appendLog(QStringLiteral("[连接] 已导出发送列表：%1").arg(path));
+}
+
+void MainWindow::onSendListSendSelected()
+{
+    if (activeSession()->state() != ca::SessionState::Connected) {
+        appendLog(QStringLiteral("[边界] 发送拒绝：会话未连接"));
+        return;
+    }
+    if (!sendListTable_)
+        return;
+    const auto rows = sendListTable_->selectionModel()->selectedRows();
+    if (rows.isEmpty()) {
+        appendLog(QStringLiteral("[边界] 请先选中列表中的一行"));
+        return;
+    }
+    const int r = rows.first().row();
+    const QString payload = sendListTable_->item(r, 2) ? sendListTable_->item(r, 2)->text().trimmed() : QString();
+    int format = FormatAuto;
+    if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 4)))
+        format = combo->currentData().toInt();
+
+    if (isLegacyMode()) {
+        ca::SendRequest req;
+        QString err;
+        const ca::Result built = buildLegacySendRequestFrom(payload, format, &req, &err);
+        if (!built.ok) {
+            appendLog(QStringLiteral("[边界] 发送拒绝：%1").arg(err.isEmpty() ? built.message : err));
+            return;
+        }
+        const ca::Result sr = legacySession_.send(req);
+        if (!sr.ok)
+            appendLog(QStringLiteral("[异常] 发送失败：%1").arg(sr.message));
+        else
+            appendData(QStringLiteral("[TX][List] %1").arg(QString::fromUtf8(req.payload)));
+        return;
+    }
+
+    QByteArray bytes;
+    QString err;
+    if (format == FormatHex || (format == FormatAuto && preferHexSend()))
+        bytes = ca::parseHexPayloadStrict(payload, &err);
+    else
+        bytes = payload.toUtf8();
+    if (!err.isEmpty() || bytes.isEmpty()) {
+        appendLog(QStringLiteral("[边界] 发送拒绝：%1").arg(err.isEmpty() ? QStringLiteral("载荷为空") : err));
+        return;
+    }
+    ca::SendRequest req;
+    req.requestId = QUuid::createUuid();
+    req.sessionId = session_.sessionId();
+    req.payload = bytes;
+    fillChannelOnRequest(&req);
+    const ca::Result sr = session_.send(req);
+    if (!sr.ok)
+        appendLog(QStringLiteral("[异常] 发送失败：%1").arg(sr.message));
+}
+
+bool MainWindow::importSendListFile(const QString& path, QString* error)
+{
+    QFile f(path);
+    if (!f.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        if (error)
+            *error = QStringLiteral("无法打开文件");
+        return false;
+    }
+    QTextStream in(&f);
+    in.setCodec("UTF-8");
+    const QString all = in.readAll();
+    const QStringList lines = all.split(QRegularExpression(QStringLiteral("[\r\n]+")), Qt::SkipEmptyParts);
+    if (lines.isEmpty()) {
+        if (error)
+            *error = QStringLiteral("文件为空");
+        return false;
+    }
+
+    sendListTable_->setRowCount(0);
+    const bool asCsv = path.endsWith(QStringLiteral(".csv"), Qt::CaseInsensitive)
+                       || lines.first().contains(QLatin1Char(','));
+
+    int loaded = 0;
+    for (int i = 0; i < lines.size(); ++i) {
+        QString line = lines.at(i).trimmed();
+        if (line.isEmpty() || line.startsWith(QLatin1Char('#')))
+            continue;
+        if (asCsv && i == 0
+            && (line.contains(QStringLiteral("enabled"), Qt::CaseInsensitive)
+                || line.contains(QStringLiteral("启用")) || line.contains(QStringLiteral("payload"))))
+            continue;
+
+        bool enabled = true;
+        QString name = QStringLiteral("导入%1").arg(loaded + 1);
+        QString payload;
+        int intervalMs = schedIntervalSpin_ ? schedIntervalSpin_->value() : 1000;
+        int format = FormatAuto;
+
+        if (asCsv) {
+            // 简易 CSV：enabled,name,payload,interval_ms,mode（payload 可用双引号包裹）
+            QStringList cols;
+            QString cur;
+            bool inQ = false;
+            for (int c = 0; c < line.size(); ++c) {
+                const QChar ch = line.at(c);
+                if (ch == QLatin1Char('"')) {
+                    inQ = !inQ;
+                    continue;
+                }
+                if (ch == QLatin1Char(',') && !inQ) {
+                    cols << cur;
+                    cur.clear();
+                    continue;
+                }
+                cur.append(ch);
+            }
+            cols << cur;
+            if (cols.size() >= 3) {
+                enabled = !(cols.at(0).trimmed() == QStringLiteral("0")
+                            || cols.at(0).trimmed().compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0);
+                name = cols.at(1).trimmed();
+                payload = cols.at(2).trimmed();
+                if (cols.size() >= 4) {
+                    bool ok = false;
+                    const int v = cols.at(3).trimmed().toInt(&ok);
+                    if (ok)
+                        intervalMs = v;
+                }
+                if (cols.size() >= 5)
+                    format = formatFromName(cols.at(4));
+            } else if (cols.size() == 1) {
+                payload = cols.at(0).trimmed();
+            } else {
+                if (error)
+                    *error = QStringLiteral("第 %1 行 CSV 列不足").arg(i + 1);
+                return false;
+            }
+        } else {
+            payload = line;
+        }
+
+        if (payload.isEmpty())
+            continue;
+        addSendListRow(enabled, name, payload, intervalMs, format);
+        ++loaded;
+    }
+    if (loaded == 0) {
+        if (error)
+            *error = QStringLiteral("未解析到有效行");
+        return false;
+    }
+    return true;
+}
+
+bool MainWindow::exportSendListFile(const QString& path, QString* error) const
+{
+    if (!sendListTable_ || sendListTable_->rowCount() == 0) {
+        if (error)
+            *error = QStringLiteral("列表为空");
+        return false;
+    }
+    QFile f(path);
+    if (!f.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        if (error)
+            *error = QStringLiteral("无法写入文件");
+        return false;
+    }
+    QTextStream out(&f);
+    out.setCodec("UTF-8");
+    const bool asCsv = path.endsWith(QStringLiteral(".csv"), Qt::CaseInsensitive);
+    if (asCsv)
+        out << QStringLiteral("enabled,name,payload,interval_ms,mode\n");
+
+    for (int r = 0; r < sendListTable_->rowCount(); ++r) {
+        const bool en = sendListTable_->item(r, 0) && sendListTable_->item(r, 0)->checkState() == Qt::Checked;
+        const QString name = sendListTable_->item(r, 1) ? sendListTable_->item(r, 1)->text() : QString();
+        const QString payload = sendListTable_->item(r, 2) ? sendListTable_->item(r, 2)->text() : QString();
+        const QString interval = sendListTable_->item(r, 3) ? sendListTable_->item(r, 3)->text() : QStringLiteral("1000");
+        int format = FormatAuto;
+        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 4)))
+            format = combo->currentData().toInt();
+        if (asCsv) {
+            QString p = payload;
+            p.replace(QLatin1Char('"'), QStringLiteral("\"\""));
+            out << (en ? QStringLiteral("1") : QStringLiteral("0")) << QLatin1Char(',')
+                << QLatin1Char('"') << name << QLatin1Char('"') << QLatin1Char(',')
+                << QLatin1Char('"') << p << QLatin1Char('"') << QLatin1Char(',')
+                << interval << QLatin1Char(',')
+                << formatName(format) << QLatin1Char('\n');
+        } else {
+            out << payload << QLatin1Char('\n');
+        }
+    }
+    return true;
 }

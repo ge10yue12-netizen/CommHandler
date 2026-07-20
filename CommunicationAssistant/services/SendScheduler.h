@@ -7,6 +7,7 @@
 #include <QObject>
 #include <QTimer>
 #include <QUuid>
+#include <QVariantMap>
 #include <QVector>
 
 namespace ca {
@@ -29,6 +30,10 @@ struct ScheduleTaskSpec
     QUuid taskId; // 空则由 Scheduler 分配
     ScheduleMode mode = ScheduleMode::Once;
     QVector<QByteArray> payloads;
+    // 与 payloads 等长时写入每条 SendRequest.attributes（Legacy 数值/文本等）
+    QVector<QVariantMap> payloadAttributes;
+    // 与 payloads 等长时：该条发送成功后的间隔；否则用 intervalMs
+    QVector<int> payloadIntervals;
     int intervalMs = 1000; // Submitted 之后到下一次发送的固定延迟
     int maxCount = 0;      // Counted/RoundRobin：>0 为次数；Once 忽略；Infinite 忽略
     QString channelId;

@@ -1,8 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="16.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <!--
-  CommunicationAssistant: Native + Legacy（链接 CommHandler.dll，CA_LINK_COMMHANDLER=1）。
-  VS2019 + Qt VS Tools, msvc2019_64 x64, C++14.
+  CommunicationAssistant: Native + Legacy。
+  完整动态库接入：include/ 头文件、lib/CommHandler.lib、runtime/→exe 旁 dll/pdb。
+  VS2019 + Qt VS Tools, msvc2019_64 x64。
   -->
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|x64">
@@ -40,7 +41,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
     <QtInstall>msvc2019_64</QtInstall>
     <QtModules>core;gui;widgets;network;serialport</QtModules>
-    <QtBuildConfig>debug</QtBuildConfig>
+    <!-- 与 CommHandler Release DLL（/MD + Release Qt）ABI 对齐；应用仍可保留 /Zi /Od。 -->
+    <QtBuildConfig>release</QtBuildConfig>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">
     <QtInstall>msvc2019_64</QtInstall>
@@ -76,27 +78,25 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <Optimization>Disabled</Optimization>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <DisableSpecificWarnings>26812;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)core;$(ProjectDir)src;$(ProjectDir)transport;$(ProjectDir)session;$(ProjectDir)services;$(ProjectDir)capture;$(ProjectDir)legacy;$(ProjectDir)..\CommLab\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;CA_LINK_COMMHANDLER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)include;$(ProjectDir)core;$(ProjectDir)src;$(ProjectDir)transport;$(ProjectDir)session;$(ProjectDir)services;$(ProjectDir)capture;$(ProjectDir)legacy;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_ITERATOR_DEBUG_LEVEL=0;_CONSOLE;CA_LINK_COMMHANDLER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\CommHandler\x64\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)..\CommHandler\x64\Debug\CommHandler.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Debug\CommHandler.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommHandler\x64\Debug\CommHandler.pdb" copy /Y "$(ProjectDir)..\CommHandler\x64\Debug\CommHandler.pdb" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommLab\x64\Debug\nicaiu.dll" copy /Y "$(ProjectDir)..\CommLab\x64\Debug\nicaiu.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommLab\x64\Debug\NET_AMC3XER.dll" copy /Y "$(ProjectDir)..\CommLab\x64\Debug\NET_AMC3XER.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommLab\x64\Debug\Usb_AMC2XE_Dll.dll" copy /Y "$(ProjectDir)..\CommLab\x64\Debug\Usb_AMC2XE_Dll.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommHandler\CommSdk\pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.dll" copy /Y "$(ProjectDir)..\CommHandler\CommSdk\pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommHandler\CommSdk\pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.dll" copy /Y "$(ProjectDir)..\CommHandler\CommSdk\pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "C:\Program Files (x86)\ART Technology\ART-DAQ\Lib\x64\Art_DAQ.dll" copy /Y "C:\Program Files (x86)\ART Technology\ART-DAQ\Lib\x64\Art_DAQ.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+      <Command>if exist "$(ProjectDir)runtime\*" copy /Y "$(ProjectDir)runtime\*" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" "E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$(OutDir)CommunicationAssistant.exe"
 exit /B 0
 </Command>
     </PostBuildEvent>
@@ -108,25 +108,25 @@ exit /B 0
       <DebugInformationFormat>None</DebugInformationFormat>
       <Optimization>MaxSpeed</Optimization>
       <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
-      <LanguageStandard>stdcpp14</LanguageStandard>
+      <LanguageStandard>stdcpp17</LanguageStandard>
       <DisableSpecificWarnings>26812;%(DisableSpecificWarnings)</DisableSpecificWarnings>
-      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)core;$(ProjectDir)src;$(ProjectDir)transport;$(ProjectDir)session;$(ProjectDir)services;$(ProjectDir)capture;$(ProjectDir)legacy;$(ProjectDir)..\CommLab\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir);$(ProjectDir)include;$(ProjectDir)core;$(ProjectDir)src;$(ProjectDir)transport;$(ProjectDir)session;$(ProjectDir)services;$(ProjectDir)capture;$(ProjectDir)legacy;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;CA_LINK_COMMHANDLER=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>false</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\CommHandler\x64\Release;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>CommHandler.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
     <PostBuildEvent>
-      <Command>if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+      <Command>if exist "$(ProjectDir)runtime\*" copy /Y "$(ProjectDir)runtime\*" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
 if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommLab\x64\Debug\nicaiu.dll" copy /Y "$(ProjectDir)..\CommLab\x64\Debug\nicaiu.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommHandler\CommSdk\pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.dll" copy /Y "$(ProjectDir)..\CommHandler\CommSdk\pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\CommHandler\CommSdk\pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.dll" copy /Y "$(ProjectDir)..\CommHandler\CommSdk\pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "C:\Program Files (x86)\ART Technology\ART-DAQ\Lib\x64\Art_DAQ.dll" copy /Y "C:\Program Files (x86)\ART Technology\ART-DAQ\Lib\x64\Art_DAQ.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" "E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$(OutDir)CommunicationAssistant.exe"
 exit /B 0
 </Command>
     </PostBuildEvent>
@@ -149,6 +149,7 @@ exit /B 0
     <ClCompile Include="legacy\LegacySession.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <QtUic Include="ui\MainWindow.ui" />
     <QtMoc Include="src\MainWindow.h" />
     <QtMoc Include="core\ICommSession.h" />
     <QtMoc Include="core\ITransport.h" />
@@ -175,6 +176,10 @@ exit /B 0
     <ClInclude Include="core\HexUtil.h" />
     <ClInclude Include="session\SessionManager.h" />
     <ClInclude Include="capture\CaptureJson.h" />
+    <ClInclude Include="include\CommHandler.h" />
+    <ClInclude Include="include\CommBase.h" />
+    <ClInclude Include="include\Any.h" />
+    <ClInclude Include="include\UIDef.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">

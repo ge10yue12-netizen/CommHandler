@@ -177,6 +177,10 @@ void SendScheduler::fireNextSend(TaskRuntime* task)
     req.channelId = task->spec.channelId;
     req.broadcast = task->spec.broadcast;
     req.payload = currentPayload(*task);
+    if (task->spec.payloadAttributes.size() == task->spec.payloads.size()
+        && task->payloadIndex >= 0 && task->payloadIndex < task->spec.payloadAttributes.size()) {
+        req.attributes = task->spec.payloadAttributes.at(task->payloadIndex);
+    }
 
     task->pendingRequestId = req.requestId;
     task->phase = Phase::AwaitingSubmitted;
@@ -195,7 +199,23 @@ void SendScheduler::scheduleInterval(TaskRuntime* task)
     if (!task || !task->timer)
         return;
     task->phase = Phase::WaitingInterval;
-    const int ms = qMax(0, task->spec.intervalMs);
+    int ms = qMax(0, task->spec.intervalMs);
+    // payloadIndex 已指向下一条；间隔取「刚发完」那一行
+    if (task->spec.payloadIntervals.size() == task->spec.payloads.size()
+        && !task->spec.payloads.isEmpty()) {
+        int prev = task->payloadIndex - 1;
+        if (task->spec.mode == ScheduleMode::RoundRobin) {
+            if (prev < 0)
+                prev = task->spec.payloads.size() - 1;
+        } else {
+            prev = qBound(0, prev, task->spec.payloads.size() - 1);
+        }
+        if (prev >= 0 && prev < task->spec.payloadIntervals.size()) {
+            const int rowMs = task->spec.payloadIntervals.at(prev);
+            if (rowMs >= 0)
+                ms = rowMs;
+        }
+    }
     task->timer->start(ms);
 }
 

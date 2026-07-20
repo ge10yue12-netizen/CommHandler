@@ -1,6 +1,7 @@
 #include "LegacySession.h"
 
 #include "ClaimFor.h"
+#include "UIDef.h"
 
 #include <QDateTime>
 #include <QElapsedTimer>
@@ -17,6 +18,27 @@ qint64 monotonicNsNow()
     if (!timer.isValid())
         timer.start();
     return timer.nsecsElapsed();
+}
+
+// 将 W_CUSTOM_* 事件码转为可读指令名（与 CommLab 对齐）
+QString legacyControlMsgName(int msg)
+{
+    switch (msg) {
+    case W_CUSTOM_COMM_STARTCALC: return QStringLiteral("开始");
+    case W_CUSTOM_COMM_STOPCALC: return QStringLiteral("停止");
+    case W_CUSTOM_COMM_EXITPROG: return QStringLiteral("退出");
+    case W_CUSTOM_COMM_AUTO_SAVE_IMAGE: return QStringLiteral("存图");
+    case W_CUSTOM_ZERO_CLEARING: return QStringLiteral("清零");
+    case W_CUSTOM_COMM_SINGALTRIIMAGESAVE: return QStringLiteral("触发存图");
+    case W_CUSTOM_COMM_RESET_LVE_LENGTH: return QStringLiteral("重置标距");
+    case W_CUSTOM_COMM_CALC_LVE_LENGTH: return QStringLiteral("识别线条标距");
+    case W_CUSTOM_COMM_DATASTREAMING: return QStringLiteral("数据流控制");
+    case W_CUSTOM_COMM_DATAPOLLING: return QStringLiteral("轮询请求");
+    case W_CUSTOM_COMM_UPDATEPULSECTRL: return QStringLiteral("刷新脉冲");
+    case W_CUSTOM_COMM_PULSECALIDONE: return QStringLiteral("脉冲标定完成");
+    case W_CUSTOM_COMM_PULSEBUTTON: return QStringLiteral("刷新脉冲按钮");
+    default: return QStringLiteral("0x%1").arg(msg, 0, 16);
+    }
 }
 } // namespace
 
@@ -262,8 +284,14 @@ Result LegacySession::validateSendAgainstCapability(const SendRequest& request, 
     }
 
     if (mode == QStringLiteral("values"))
-        return Result::fail(QStringLiteral("capability_denied"), QStringLiteral("当前协议不支持协议数值发送"));
-    return Result::fail(QStringLiteral("capability_denied"), QStringLiteral("当前协议不支持发送或载荷无法解析"));
+        return Result::fail(QStringLiteral("capability_denied"),
+                            QStringLiteral("当前协议不支持协议数值发送，或数值格式/个数不符合要求"));
+    if (!profile_.supports(LegacyCapability::SendEncodedValues)
+        && !profile_.supports(LegacyCapability::SendTransparentText))
+        return Result::fail(QStringLiteral("capability_denied"),
+                            QStringLiteral("当前协议在库中无业务发送路径（发数值✗ 发文本✗）"));
+    return Result::fail(QStringLiteral("capability_denied"),
+                        QStringLiteral("载荷无法解析为合法数值，且当前协议不支持透明文本"));
 }
 
 void LegacySession::onInitializeFinished(bool ok, const QString& code, const QString& message)
@@ -368,7 +396,12 @@ void LegacySession::onControlEvent(int ctrlCmd, int viewId, int msg)
     rec.attributes.insert(QStringLiteral("ctrlCmd"), ctrlCmd);
     rec.attributes.insert(QStringLiteral("viewId"), viewId);
     rec.attributes.insert(QStringLiteral("msg"), msg);
-    rec.summary = QStringLiteral("Legacy 控制事件");
+    rec.attributes.insert(QStringLiteral("msgName"), legacyControlMsgName(msg));
+    rec.summary = QStringLiteral("Legacy 控制 %1 | ctrlCmd=%2 viewId=%3 msg=%4")
+                      .arg(legacyControlMsgName(msg))
+                      .arg(ctrlCmd)
+                      .arg(viewId)
+                      .arg(msg);
     emit recordReceived(rec);
 }
 
@@ -387,8 +420,13 @@ void LegacySession::onParameterEvent(int ctrlCmd, int viewId, int msg, const QVa
     rec.attributes.insert(QStringLiteral("ctrlCmd"), ctrlCmd);
     rec.attributes.insert(QStringLiteral("viewId"), viewId);
     rec.attributes.insert(QStringLiteral("msg"), msg);
+    rec.attributes.insert(QStringLiteral("msgName"), legacyControlMsgName(msg));
     rec.attributes.insert(QStringLiteral("extra"), extra);
-    rec.summary = QStringLiteral("Legacy 参数事件");
+    rec.summary = QStringLiteral("Legacy 参数 %1 | ctrlCmd=%2 viewId=%3 msg=%4")
+                      .arg(legacyControlMsgName(msg))
+                      .arg(ctrlCmd)
+                      .arg(viewId)
+                      .arg(msg);
     emit recordReceived(rec);
 }
 
@@ -495,7 +533,8 @@ void LegacySession::tearDown(bool fromFault)
     conn.direction = Direction::System;
     conn.wallTime = QDateTime::currentDateTimeUtc();
     conn.monotonicNs = monotonicNsNow();
-    conn.summary = QStringLiteral("Legacy 已断开");
+    conn.summary = fromFault ? QStringLiteral("Legacy 连接中断（故障断开）")
+                             : QStringLiteral("Legacy 已断开");
     emit recordReceived(conn);
     tearingDown_ = false;
 }

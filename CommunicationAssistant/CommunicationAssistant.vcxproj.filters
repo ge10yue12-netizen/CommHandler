@@ -1,0 +1,205 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\src">
+      <UniqueIdentifier>{A11A0001-0001-4000-8000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\transport">
+      <UniqueIdentifier>{A11A0001-0001-4000-8000-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\session">
+      <UniqueIdentifier>{A11A0001-0001-4000-8000-000000000003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\services">
+      <UniqueIdentifier>{A11A0001-0001-4000-8000-000000000004}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\capture">
+      <UniqueIdentifier>{A11A0001-0001-4000-8000-000000000005}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\legacy">
+      <UniqueIdentifier>{A11A0001-0001-4000-8000-000000000006}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx</Extensions>
+    </Filter>
+    <Filter Include="Header Files\src">
+      <UniqueIdentifier>{B22B0001-0001-4000-8000-000000000001}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\core">
+      <UniqueIdentifier>{B22B0001-0001-4000-8000-000000000002}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\transport">
+      <UniqueIdentifier>{B22B0001-0001-4000-8000-000000000003}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\session">
+      <UniqueIdentifier>{B22B0001-0001-4000-8000-000000000004}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\services">
+      <UniqueIdentifier>{B22B0001-0001-4000-8000-000000000005}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\capture">
+      <UniqueIdentifier>{B22B0001-0001-4000-8000-000000000006}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\legacy">
+      <UniqueIdentifier>{B22B0001-0001-4000-8000-000000000007}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\include">
+      <UniqueIdentifier>{B22B0001-0001-4000-8000-000000000008}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Form Files">
+      <UniqueIdentifier>{99349809-55D3-4D72-8C25-8C1F3A0B0B0A}</UniqueIdentifier>
+      <Extensions>ui</Extensions>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\main.cpp">
+      <Filter>Source Files\src</Filter>
+    </ClCompile>
+    <ClCompile Include="src\MainWindow.cpp">
+      <Filter>Source Files\src</Filter>
+    </ClCompile>
+    <ClCompile Include="transport\SerialTransport.cpp">
+      <Filter>Source Files\transport</Filter>
+    </ClCompile>
+    <ClCompile Include="transport\TcpClientTransport.cpp">
+      <Filter>Source Files\transport</Filter>
+    </ClCompile>
+    <ClCompile Include="transport\TcpServerTransport.cpp">
+      <Filter>Source Files\transport</Filter>
+    </ClCompile>
+    <ClCompile Include="transport\UdpTransport.cpp">
+      <Filter>Source Files\transport</Filter>
+    </ClCompile>
+    <ClCompile Include="session\NativeSession.cpp">
+      <Filter>Source Files\session</Filter>
+    </ClCompile>
+    <ClCompile Include="services\SendScheduler.cpp">
+      <Filter>Source Files\services</Filter>
+    </ClCompile>
+    <ClCompile Include="capture\CaptureWriter.cpp">
+      <Filter>Source Files\capture</Filter>
+    </ClCompile>
+    <ClCompile Include="capture\CaptureManager.cpp">
+      <Filter>Source Files\capture</Filter>
+    </ClCompile>
+    <ClCompile Include="legacy\LegacyCapability.cpp">
+      <Filter>Source Files\legacy</Filter>
+    </ClCompile>
+    <ClCompile Include="legacy\ILegacyBackend.cpp">
+      <Filter>Source Files\legacy</Filter>
+    </ClCompile>
+    <ClCompile Include="legacy\LegacyWorker.cpp">
+      <Filter>Source Files\legacy</Filter>
+    </ClCompile>
+    <ClCompile Include="legacy\LegacyWatchdog.cpp">
+      <Filter>Source Files\legacy</Filter>
+    </ClCompile>
+    <ClCompile Include="legacy\LegacySession.cpp">
+      <Filter>Source Files\legacy</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <QtMoc Include="src\MainWindow.h">
+      <Filter>Header Files\src</Filter>
+    </QtMoc>
+    <QtMoc Include="core\ICommSession.h">
+      <Filter>Header Files\core</Filter>
+    </QtMoc>
+    <QtMoc Include="core\ITransport.h">
+      <Filter>Header Files\core</Filter>
+    </QtMoc>
+    <QtMoc Include="core\NullSession.h">
+      <Filter>Header Files\core</Filter>
+    </QtMoc>
+    <QtMoc Include="transport\SerialTransport.h">
+      <Filter>Header Files\transport</Filter>
+    </QtMoc>
+    <QtMoc Include="transport\TcpClientTransport.h">
+      <Filter>Header Files\transport</Filter>
+    </QtMoc>
+    <QtMoc Include="transport\TcpServerTransport.h">
+      <Filter>Header Files\transport</Filter>
+    </QtMoc>
+    <QtMoc Include="transport\UdpTransport.h">
+      <Filter>Header Files\transport</Filter>
+    </QtMoc>
+    <QtMoc Include="session\NativeSession.h">
+      <Filter>Header Files\session</Filter>
+    </QtMoc>
+    <QtMoc Include="services\SendScheduler.h">
+      <Filter>Header Files\services</Filter>
+    </QtMoc>
+    <QtMoc Include="capture\CaptureWriter.h">
+      <Filter>Header Files\capture</Filter>
+    </QtMoc>
+    <QtMoc Include="capture\CaptureManager.h">
+      <Filter>Header Files\capture</Filter>
+    </QtMoc>
+    <QtMoc Include="legacy\ILegacyBackend.h">
+      <Filter>Header Files\legacy</Filter>
+    </QtMoc>
+    <QtMoc Include="legacy\LegacyWorker.h">
+      <Filter>Header Files\legacy</Filter>
+    </QtMoc>
+    <QtMoc Include="legacy\LegacyWatchdog.h">
+      <Filter>Header Files\legacy</Filter>
+    </QtMoc>
+    <QtMoc Include="legacy\LegacySession.h">
+      <Filter>Header Files\legacy</Filter>
+    </QtMoc>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="legacy\LegacyCapability.h">
+      <Filter>Header Files\legacy</Filter>
+    </ClInclude>
+    <ClInclude Include="core\Types.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\Result.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\ResourceClaim.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\SessionConfig.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\CommRecord.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\ClaimFor.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="core\HexUtil.h">
+      <Filter>Header Files\core</Filter>
+    </ClInclude>
+    <ClInclude Include="session\SessionManager.h">
+      <Filter>Header Files\session</Filter>
+    </ClInclude>
+    <ClInclude Include="capture\CaptureJson.h">
+      <Filter>Header Files\capture</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CommHandler.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\CommBase.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\Any.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+    <ClInclude Include="include\UIDef.h">
+      <Filter>Header Files\include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <QtUic Include="ui\MainWindow.ui">
+      <Filter>Form Files</Filter>
+    </QtUic>
+  </ItemGroup>
+</Project>

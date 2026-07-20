@@ -117,6 +117,16 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
             put(&p, LegacyCapability::SendEncodedValues, false, QStringLiteral("需 4 值数值发送未验证→不支持"));
             put(&p, LegacyCapability::SendTransparentText, true);
             break;
+        case 8:
+            // 联恒光科网口（BASELINE V1.2.5 / iProtoType=8）
+            put(&p, LegacyCapability::ReceiveValues, true);
+            put(&p, LegacyCapability::ReceiveControlEvents, true);
+            put(&p, LegacyCapability::ReceiveParameterEvents, false);
+            put(&p, LegacyCapability::SendEncodedValues, true, QString(), QStringLiteral("至少 2 个数值（力、温）"));
+            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("联恒不支持透明文本"));
+            put(&p, LegacyCapability::RequiresPollingPermission, true);
+            put(&p, LegacyCapability::RequiresStreamingState, true);
+            break;
         default:
             put(&p, LegacyCapability::ReceiveValues, false, QStringLiteral("未知网口协议"));
             put(&p, LegacyCapability::ReceiveControlEvents, false);
@@ -163,6 +173,16 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
         put(&p, LegacyCapability::SendEncodedValues, true, QString(), QStringLiteral("至少 2 个数值"));
         put(&p, LegacyCapability::SendTransparentText, false);
+        break;
+    case 5:
+        // 联恒光科串口（BASELINE V1.2.5 / iProtocolType=5）
+        put(&p, LegacyCapability::ReceiveValues, true);
+        put(&p, LegacyCapability::ReceiveControlEvents, true);
+        put(&p, LegacyCapability::ReceiveParameterEvents, false);
+        put(&p, LegacyCapability::SendEncodedValues, true, QString(), QStringLiteral("至少 2 个数值（力、温）"));
+        put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("SendData(QString) 空实现"));
+        put(&p, LegacyCapability::RequiresPollingPermission, true);
+        put(&p, LegacyCapability::RequiresStreamingState, true);
         break;
     default:
         put(&p, LegacyCapability::ReceiveValues, false);

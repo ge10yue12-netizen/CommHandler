@@ -971,15 +971,15 @@ static void testCaptureTruncatedTailIgnored()
 
 static void testLegacyCapabilityTable()
 {
-    // 网口 0–7：逐项核对 Raw 恒关，并抽检关键能力位
-    for (int i = 0; i <= 7; ++i) {
+    // 网口 0–8：逐项核对 Raw 恒关，并抽检关键能力位
+    for (int i = 0; i <= 8; ++i) {
         const ca::LegacyCapabilityProfile p = ca::legacyCapabilityFor(ca::LegacyCommKind::Network, i);
         expect(!p.supports(ca::LegacyCapability::RawReceive), "cap net raw off");
         expect(!p.supports(ca::LegacyCapability::RawSend), "cap net rawsend off");
         expect(p.protocolIndex == i, "cap net index");
     }
-    // 串口 0–4
-    for (int i = 0; i <= 4; ++i) {
+    // 串口 0–5
+    for (int i = 0; i <= 5; ++i) {
         const ca::LegacyCapabilityProfile p = ca::legacyCapabilityFor(ca::LegacyCommKind::Serial, i);
         expect(!p.supports(ca::LegacyCapability::RawReceive), "cap ser raw off");
         expect(p.protocolIndex == i, "cap ser index");
@@ -997,6 +997,17 @@ static void testLegacyCapabilityTable()
     expect(ser3.supports(ca::LegacyCapability::SendEncodedValues), "cap ser3 send");
     expect(ser3.entries.value(static_cast<int>(ca::LegacyCapability::SendEncodedValues)).limitation.contains(QStringLiteral("5")),
            "cap ser3 need 5");
+
+    const ca::LegacyCapabilityProfile ser5 = ca::legacyCapabilityFor(ca::LegacyCommKind::Serial, 5);
+    expect(ser5.supports(ca::LegacyCapability::ReceiveControlEvents), "cap ser5 ctrl");
+    expect(ser5.supports(ca::LegacyCapability::SendEncodedValues), "cap ser5 send");
+    expect(ser5.entries.value(static_cast<int>(ca::LegacyCapability::SendEncodedValues)).limitation.contains(QStringLiteral("2")),
+           "cap ser5 need 2");
+
+    const ca::LegacyCapabilityProfile net8 = ca::legacyCapabilityFor(ca::LegacyCommKind::Network, 8);
+    expect(net8.supports(ca::LegacyCapability::ReceiveValues), "cap net8 values");
+    expect(net8.supports(ca::LegacyCapability::ReceiveControlEvents), "cap net8 ctrl");
+    expect(!net8.supports(ca::LegacyCapability::SendTransparentText), "cap net8 no text");
 }
 
 // Voltage(2)/Pulse(3) 须在 configure 阶段拒绝，不得进入 Worker
