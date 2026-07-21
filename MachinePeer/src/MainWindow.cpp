@@ -7,7 +7,7 @@
 
 #include <QDateTime>
 
-// 构造：通道默认串口；指令与测数分槽；挂接收包解析
+// 构造：加载 peerconfig；默认网口 TCP 服务端 :9000（对齐助手 TCP 客户端）
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent)
 {
@@ -15,18 +15,35 @@ MainWindow::MainWindow(QWidget* parent)
     setWindowTitle(QStringLiteral("MachinePeer — 试验机"));
     ui.cmbCommType->clear();
     ui.cmbCommType->addItems({QStringLiteral("网口"), QStringLiteral("串口")});
-    ui.cmbCommType->setCurrentIndex(1);
     ProtoGuide::fillSerialCombos(ui.cmbBaud, ui.cmbDataBits, ui.cmbParity, ui.cmbStopBits);
-    refillProtoCombo();
+
+    ui.cmbTransfer->clear();
+    ui.cmbTransfer->addItem(QStringLiteral("TCP"), 0);
+    ui.cmbTransfer->addItem(QStringLiteral("UDP"), 1);
+    ui.cmbModel->clear();
+    ui.cmbModel->addItem(QStringLiteral("服务端"), 0);
+    ui.cmbModel->addItem(QStringLiteral("客户端"), 1);
+
     m_cfg = LoadPeerConfig();
+    ui.cmbCommType->setCurrentIndex(m_cfg.defaultCommType);
+    refillProtoCombo();
     ui.editLocalIp->setText(m_cfg.localIp);
     ui.editDestIp->setText(m_cfg.destIp);
     ui.spinLocalPort->setValue(m_cfg.localPort);
     ui.spinDestPort->setValue(m_cfg.destPort);
+    ui.cmbTransfer->setCurrentIndex(m_cfg.transferType == 1 ? 1 : 0);
+    ui.cmbModel->setCurrentIndex(m_cfg.model == 1 ? 1 : 0);
     ui.spinComPort->setValue(m_cfg.comPort);
+    {
+        const int baudIdx = ui.cmbBaud->findText(QString::number(m_cfg.baudRate));
+        if (baudIdx >= 0)
+            ui.cmbBaud->setCurrentIndex(baudIdx);
+    }
 
     QObject::connect(ui.cmbCommType, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
                      &MainWindow::onChannelChanged);
+    QObject::connect(ui.cmbTransfer, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+                     &MainWindow::onTransferChanged);
     QObject::connect(ui.cmbProto, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
                      [this](int) { syncUi(); });
     QObject::connect(ui.spinComPort, QOverload<int>::of(&QSpinBox::valueChanged), this,
@@ -43,12 +60,17 @@ MainWindow::MainWindow(QWidget* parent)
                      this, &MainWindow::onSerialBytesReceived);
     QObject::connect(&m_channels, &PeerChannelManager::networkDatagramReceived,
                      this, &MainWindow::onNetworkDatagramReceived);
+    QObject::connect(&m_channels, &PeerChannelManager::networkPeerConnected,
+                     this, &MainWindow::onNetworkPeerConnected);
+    QObject::connect(&m_channels, &PeerChannelManager::networkPeerDisconnected,
+                     this, &MainWindow::onNetworkPeerDisconnected);
 
     ui.lblComEcho->setText(QStringLiteral("COM%1").arg(ui.spinComPort->value() + 1));
+    onTransferChanged(ui.cmbTransfer->currentIndex());
     syncUi();
 }
 
-// 析构：关闭串口与 UDP
+// 析构：关闭通道
 MainWindow::~MainWindow()
 {
     closeAll();
@@ -80,6 +102,20 @@ void MainWindow::onChannelChanged(int)
     syncUi();
 }
 
+// 传输类型变化：UDP 时角色无意义，禁用角色下拉
+void MainWindow::onTransferChanged(int)
+{
+    const bool tcp = ui.cmbTransfer->currentData().toInt() == 0;
+    ui.cmbModel->setEnabled(tcp && !m_ready);
+    ui.lblModel->setEnabled(tcp);
+    if (!tcp)
+        ui.lblLocalIp->setText(QStringLiteral("本机"));
+    else if (ui.cmbModel->currentData().toInt() == 0)
+        ui.lblLocalIp->setText(QStringLiteral("监听"));
+    else
+        ui.lblLocalIp->setText(QStringLiteral("本机"));
+}
+
 // 按库能力使能开始/停止/存图/清零/发力温等按钮
 void MainWindow::syncUi()
 {
@@ -96,6 +132,7 @@ void MainWindow::syncUi()
     ui.udpPanel->setEnabled(!m_ready);
     ui.serialPanel->setEnabled(!m_ready);
     ui.groupOps->setEnabled(m_ready);
+    onTransferChanged(ui.cmbTransfer->currentIndex());
 
     // true：库支持开始指令
     const bool canStart = m_ready && (net ? NetworkProtocol::canSendCommand(p, 0)
@@ -118,7 +155,14 @@ void MainWindow::syncUi()
     ui.btnCmdSave->setEnabled(canSave);
     ui.btnCmdZero->setEnabled(canZero);
     ui.btnSendMeasure->setEnabled(canMeas);
-    ui.lblStatus->setText(m_ready ? QStringLiteral("已打开") : QStringLiteral("未打开"));
+    if (!m_ready) {
+        ui.lblStatus->setText(QStringLiteral("未打开"));
+    } else if (net && ui.cmbTransfer->currentData().toInt() == 0
+               && !m_channels.isNetworkPeerReady()) {
+        ui.lblStatus->setText(QStringLiteral("已监听（等待助手连接）"));
+    } else {
+        ui.lblStatus->setText(QStringLiteral("已打开"));
+    }
 }
 
 // 关闭串口与 UDP，并清空粘包缓冲
@@ -226,6 +270,8 @@ PeerNetworkSettings MainWindow::networkSettings() const
     settings.localPort = ui.spinLocalPort->value();
     settings.destinationIp = ui.editDestIp->text().trimmed();
     settings.destinationPort = ui.spinDestPort->value();
+    settings.transferType = ui.cmbTransfer->currentData().toInt();
+    settings.model = ui.cmbModel->currentData().toInt();
     return settings;
 }
 
@@ -236,9 +282,43 @@ void MainWindow::onOpenClicked()
     m_ready = isNetwork()
         ? m_channels.openNetwork(networkSettings(), &fail)
         : m_channels.openSerial(serialSettings(), &fail);
-    if (!m_ready)
+    if (!m_ready) {
         log(QStringLiteral("ERR %1").arg(fail));
+    } else if (isNetwork()) {
+        const PeerNetworkSettings ns = networkSettings();
+        if (ns.transferType == 1) {
+            log(QStringLiteral("UDP 已绑定 %1:%2 → 软件 %3:%4")
+                    .arg(ns.localIp)
+                    .arg(ns.localPort)
+                    .arg(ns.destinationIp)
+                    .arg(ns.destinationPort));
+        } else if (ns.model == 0) {
+            log(QStringLiteral("TCP 服务端已监听 %1:%2（助手请用 TCP 客户端连此端口）")
+                    .arg(ns.localIp)
+                    .arg(ns.localPort));
+        } else {
+            log(QStringLiteral("TCP 客户端已连接 %1:%2")
+                    .arg(ns.destinationIp)
+                    .arg(ns.destinationPort));
+        }
+    } else {
+        log(QStringLiteral("串口已打开 COM%1").arg(ui.spinComPort->value() + 1));
+    }
     m_serialRxBuf.clear();
+    syncUi();
+}
+
+// TCP 对端已连接
+void MainWindow::onNetworkPeerConnected(QString endpoint)
+{
+    log(QStringLiteral("TCP 对端已连接 %1").arg(endpoint));
+    syncUi();
+}
+
+// TCP 对端已断开
+void MainWindow::onNetworkPeerDisconnected()
+{
+    log(QStringLiteral("TCP 对端已断开"));
     syncUi();
 }
 

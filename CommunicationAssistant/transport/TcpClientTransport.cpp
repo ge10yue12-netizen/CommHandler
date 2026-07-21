@@ -38,11 +38,13 @@ Result TcpClientTransport::open(const TransportConfig& config)
     setState(TransportState::Opening);
     socket_.connectToHost(host, port);
     // [DECISION] 有界等待 5s，禁止 waitForConnected(-1)
-    if (!socket_.waitForConnected(5000)) {
+    if (!socket_.waitForConnected(5000)
+        || socket_.state() != QAbstractSocket::ConnectedState) {
         const QString msg = socket_.errorString();
         socket_.abort();
         setState(TransportState::Closed);
-        return Result::fail(QStringLiteral("tcp_connect_failed"), msg.isEmpty() ? QStringLiteral("连接超时") : msg);
+        return Result::fail(QStringLiteral("tcp_connect_failed"),
+                            msg.isEmpty() ? QStringLiteral("连接超时或对端拒绝") : msg);
     }
 
     setState(TransportState::Open);

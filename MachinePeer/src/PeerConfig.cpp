@@ -23,9 +23,19 @@ PeerConfig LoadPeerConfig()
             cfg.destIp = dip;
         cfg.localPort = clampPort(ini.value(QStringLiteral("bind_port"), cfg.localPort).toInt(), cfg.localPort);
         cfg.destPort = clampPort(ini.value(QStringLiteral("peer_port"), cfg.destPort).toInt(), cfg.destPort);
+        cfg.transferType = ini.value(QStringLiteral("transfer_type"), cfg.transferType).toInt();
+        if (cfg.transferType != 0 && cfg.transferType != 1)
+            cfg.transferType = 0;
+        cfg.model = ini.value(QStringLiteral("model"), cfg.model).toInt();
+        if (cfg.model != 0 && cfg.model != 1)
+            cfg.model = 0;
+        cfg.defaultCommType = ini.value(QStringLiteral("default_comm"), cfg.defaultCommType).toInt();
+        if (cfg.defaultCommType != 0 && cfg.defaultCommType != 1)
+            cfg.defaultCommType = 0;
         ini.endGroup();
         ini.beginGroup(QStringLiteral("serial"));
         cfg.comPort = ini.value(QStringLiteral("port_index"), cfg.comPort).toInt();
+        cfg.baudRate = ini.value(QStringLiteral("baud"), cfg.baudRate).toInt();
         ini.endGroup();
         return cfg;
     }

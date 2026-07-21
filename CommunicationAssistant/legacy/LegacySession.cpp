@@ -58,6 +58,7 @@ LegacySession::LegacySession(SessionManager* manager, QObject* parent)
     connect(worker_, &LegacyWorker::valuesReceived, this, &LegacySession::onValuesReceived, Qt::QueuedConnection);
     connect(worker_, &LegacyWorker::controlEvent, this, &LegacySession::onControlEvent, Qt::QueuedConnection);
     connect(worker_, &LegacyWorker::parameterEvent, this, &LegacySession::onParameterEvent, Qt::QueuedConnection);
+    connect(worker_, &LegacyWorker::unparsedRx, this, &LegacySession::onUnparsedRx, Qt::QueuedConnection);
     connect(worker_, &LegacyWorker::backendError, this, &LegacySession::onBackendError, Qt::QueuedConnection);
     connect(worker_, &LegacyWorker::disconnected, this, &LegacySession::onBackendDisconnected, Qt::QueuedConnection);
     connect(worker_, &LegacyWorker::shutdownFinished, this, &LegacySession::onWorkerShutdownFinished);
@@ -160,7 +161,7 @@ Result LegacySession::open()
         manager_->release(config_.sessionId);
         setSessionState(SessionState::Closed);
         return Result::fail(QStringLiteral("legacy_invoke_failed"),
-                            QStringLiteral("无法投递 Legacy initialize（检查 metatype 注册）"));
+                            QStringLiteral("无法投递兼容通道初始化（请检查元类型注册）"));
     }
     return Result::success();
 }
@@ -172,7 +173,7 @@ Result LegacySession::close()
     if (state_ == SessionState::Unresponsive) {
         // 基线：不向可能阻塞的 Worker 排 close；仅提示侧已禁新命令
         return Result::fail(QStringLiteral("unresponsive"),
-                            QStringLiteral("会话不可响应，请重启应用以回收 Worker"));
+                            QStringLiteral("会话无响应，请重启应用程序以回收工作线程"));
     }
     if (tearingDown_)
         return Result::success();
@@ -263,6 +264,8 @@ Result LegacySession::validateSendAgainstCapability(const SendRequest& request, 
 
             const QString lim =
                 profile_.entries.value(static_cast<int>(LegacyCapability::SendEncodedValues)).limitation;
+            if (lim.contains(QStringLiteral("恰好 4")) && values.size() != 4)
+                return Result::fail(QStringLiteral("invalid_value_count"), QStringLiteral("需要恰好 4 个数值"));
             if (lim.contains(QStringLiteral("5")) && values.size() < 5)
                 return Result::fail(QStringLiteral("invalid_value_count"), QStringLiteral("至少需要 5 个数值"));
             if (lim.contains(QStringLiteral("2")) && values.size() < 2)
@@ -289,7 +292,7 @@ Result LegacySession::validateSendAgainstCapability(const SendRequest& request, 
     if (!profile_.supports(LegacyCapability::SendEncodedValues)
         && !profile_.supports(LegacyCapability::SendTransparentText))
         return Result::fail(QStringLiteral("capability_denied"),
-                            QStringLiteral("当前协议在库中无业务发送路径（发数值✗ 发文本✗）"));
+                            QStringLiteral("当前协议无可用发送路径（发数值与发文本均不支持）"));
     return Result::fail(QStringLiteral("capability_denied"),
                         QStringLiteral("载荷无法解析为合法数值，且当前协议不支持透明文本"));
 }
@@ -336,7 +339,16 @@ void LegacySession::onConnectFinished(bool ok, const QString& code, const QStrin
     conn.direction = Direction::System;
     conn.wallTime = QDateTime::currentDateTimeUtc();
     conn.monotonicNs = monotonicNsNow();
-    conn.summary = QStringLiteral("Legacy 已连接");
+    // 协议 index 不改变连通语义；按串口/TCP/UDP 角色写摘要
+    if (config_.transport.legacy.commType == 1) {
+        conn.summary = QStringLiteral("Legacy 串口已打开");
+    } else if (config_.transport.legacy.transferType == 1) {
+        conn.summary = QStringLiteral("Legacy UDP 已绑定");
+    } else if (config_.transport.legacy.model == 0) {
+        conn.summary = QStringLiteral("Legacy TCP 已监听（等待客户端）");
+    } else {
+        conn.summary = QStringLiteral("Legacy TCP 已连接");
+    }
     emit recordReceived(conn);
 }
 
@@ -362,8 +374,10 @@ void LegacySession::onSendFinished(bool ok, const QString& code, const QString& 
 
 void LegacySession::onValuesReceived(const QVector<double>& values, int type)
 {
-    if (!profile_.supports(LegacyCapability::ReceiveValues))
+    if (!profile_.supports(LegacyCapability::ReceiveValues)) {
+        emitRxCapDrop(QStringLiteral("收数值✗"), values.size());
         return;
+    }
     CommRecord rec;
     rec.sessionId = config_.sessionId;
     rec.sequence = ++sequence_;
@@ -377,14 +391,17 @@ void LegacySession::onValuesReceived(const QVector<double>& values, int type)
         list.push_back(d);
     rec.attributes.insert(QStringLiteral("values"), list);
     rec.attributes.insert(QStringLiteral("legacyType"), type);
+    rec.attributes.insert(QStringLiteral("protocolLabel"), protocolObjectLabel());
     rec.summary = QStringLiteral("Legacy 数值 %1 个").arg(values.size());
     emit recordReceived(rec);
 }
 
 void LegacySession::onControlEvent(int ctrlCmd, int viewId, int msg)
 {
-    if (!profile_.supports(LegacyCapability::ReceiveControlEvents))
+    if (!profile_.supports(LegacyCapability::ReceiveControlEvents)) {
+        emitRxCapDrop(QStringLiteral("收控制✗"), 1);
         return;
+    }
     CommRecord rec;
     rec.sessionId = config_.sessionId;
     rec.sequence = ++sequence_;
@@ -407,8 +424,10 @@ void LegacySession::onControlEvent(int ctrlCmd, int viewId, int msg)
 
 void LegacySession::onParameterEvent(int ctrlCmd, int viewId, int msg, const QVariantMap& extra)
 {
-    if (!profile_.supports(LegacyCapability::ReceiveParameterEvents))
+    if (!profile_.supports(LegacyCapability::ReceiveParameterEvents)) {
+        emitRxCapDrop(QStringLiteral("收参数✗"), 1);
         return;
+    }
     CommRecord rec;
     rec.sessionId = config_.sessionId;
     rec.sequence = ++sequence_;
@@ -430,6 +449,70 @@ void LegacySession::onParameterEvent(int ctrlCmd, int viewId, int msg, const QVa
     emit recordReceived(rec);
 }
 
+void LegacySession::onUnparsedRx(const QByteArray& raw)
+{
+    if (raw.isEmpty())
+        return;
+
+    // 单包上限：截断后仍可观测，避免 Queued/UI 被巨包打爆
+    QByteArray body = raw;
+    bool truncated = false;
+    if (body.size() > kMaxUnparsedBytes) {
+        body = body.left(kMaxUnparsedBytes);
+        truncated = true;
+    }
+
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (lastUnparsedEmitMs_ > 0 && (now - lastUnparsedEmitMs_) < kUnparsedMinIntervalMs) {
+        ++suppressedUnparsedCount_;
+        return;
+    }
+
+    const int suppressed = suppressedUnparsedCount_;
+    suppressedUnparsedCount_ = 0;
+    lastUnparsedEmitMs_ = now;
+
+    // 进数据窗：有线帧字节；summary 供日志短码
+    CommRecord rec;
+    rec.sessionId = config_.sessionId;
+    rec.sequence = ++sequence_;
+    rec.kind = RecordKind::RawChunk;
+    rec.status = RecordStatus::Observed;
+    rec.direction = Direction::Rx;
+    rec.wallTime = QDateTime::currentDateTimeUtc();
+    rec.monotonicNs = monotonicNsNow();
+    rec.bytes = body;
+    rec.attributes.insert(QStringLiteral("legacyUnparsed"), true);
+    rec.attributes.insert(QStringLiteral("protocolLabel"), protocolObjectLabel());
+    if (truncated)
+        rec.attributes.insert(QStringLiteral("truncated"), true);
+    if (raw.size() > body.size())
+        rec.attributes.insert(QStringLiteral("rawSize"), raw.size());
+    rec.summary = QStringLiteral("接收 | %1 | 协议解析失败").arg(protocolObjectLabel());
+    emit recordReceived(rec);
+
+    CommRecord tip;
+    tip.sessionId = config_.sessionId;
+    tip.sequence = ++sequence_;
+    tip.kind = RecordKind::ErrorEvent;
+    tip.status = RecordStatus::Observed;
+    tip.direction = Direction::System;
+    tip.wallTime = QDateTime::currentDateTimeUtc();
+    tip.monotonicNs = monotonicNsNow();
+    tip.errorCode = QStringLiteral("rx_unparsed");
+    if (suppressed > 0) {
+        tip.summary = QStringLiteral("接收 | %1 | 协议解析失败 %2 字节（已抑制重复 %3 次）")
+                          .arg(protocolObjectLabel())
+                          .arg(raw.size())
+                          .arg(suppressed);
+    } else {
+        tip.summary = QStringLiteral("接收 | %1 | 协议解析失败 %2 字节")
+                          .arg(protocolObjectLabel())
+                          .arg(raw.size());
+    }
+    emit recordReceived(tip);
+}
+
 void LegacySession::onBackendError(const QString& code, const QString& message)
 {
     emitError(code, message);
@@ -439,8 +522,20 @@ void LegacySession::onBackendError(const QString& code, const QString& message)
 
 void LegacySession::onBackendDisconnected()
 {
-    if (state_ == SessionState::Connected)
+    // Opening 期间对端拒绝/瞬时断开：必须失败收尾，禁止随后误标「已连接」
+    if (state_ == SessionState::Opening) {
+        watchdog_.disarm(pendingOpenOp_);
+        cancelOpen_ = true;
+        QMetaObject::invokeMethod(worker_, "disconnectDevice", Qt::QueuedConnection);
+        emitError(QStringLiteral("legacy_connect_rejected"),
+                  QStringLiteral("连接未完成：对端拒绝或连接过程中已断开"));
         tearDown(true);
+        return;
+    }
+    if (state_ == SessionState::Connected) {
+        QMetaObject::invokeMethod(worker_, "disconnectDevice", Qt::QueuedConnection);
+        tearDown(true);
+    }
 }
 
 void LegacySession::onWatchdogTimeout(const QUuid& opId)
@@ -448,8 +543,8 @@ void LegacySession::onWatchdogTimeout(const QUuid& opId)
     Q_UNUSED(opId);
     setSessionState(SessionState::Unresponsive);
     emitError(QStringLiteral("legacy_unresponsive"),
-              QStringLiteral("Legacy Worker 超时（Unresponsive）；已禁止新命令，请重启应用"));
-    emit unresponsive(QStringLiteral("Legacy Worker 无响应"));
+              QStringLiteral("兼容通道工作线程超时（无响应）；已禁止新操作，请重启应用程序"));
+    emit unresponsive(QStringLiteral("兼容通道工作线程无响应"));
     // 不 terminate、不向 Worker 排 close
 }
 
@@ -489,6 +584,32 @@ void LegacySession::emitError(const QString& code, const QString& message, const
     emit errorOccurred(err);
 }
 
+QString LegacySession::protocolObjectLabel() const
+{
+    const bool serial = (config_.transport.legacy.commType == 1);
+    return QStringLiteral("%1%2")
+        .arg(serial ? QStringLiteral("串口") : QStringLiteral("网口"))
+        .arg(config_.transport.legacy.protocolIndex);
+}
+
+void LegacySession::emitRxCapDrop(const QString& reasonCode, int droppedCount)
+{
+    // 仅 recordReceived，不走 errorOccurred，避免再刷一条「异常」
+    CommRecord rec;
+    rec.sessionId = config_.sessionId;
+    rec.sequence = ++sequence_;
+    rec.kind = RecordKind::ErrorEvent;
+    rec.status = RecordStatus::Observed;
+    rec.direction = Direction::System;
+    rec.wallTime = QDateTime::currentDateTimeUtc();
+    rec.monotonicNs = monotonicNsNow();
+    rec.errorCode = QStringLiteral("rx_cap");
+    rec.summary = QStringLiteral("接收 | %1 | 能力下降：%2，丢弃 %3")
+                      .arg(protocolObjectLabel(), reasonCode)
+                      .arg(droppedCount);
+    emit recordReceived(rec);
+}
+
 void LegacySession::emitTxRecord(const SendRequest& request, RecordStatus status, const QString& code,
                                  const QString& message)
 {
@@ -506,7 +627,7 @@ void LegacySession::emitTxRecord(const SendRequest& request, RecordStatus status
     rec.attributes = request.attributes;
     rec.errorCode = code;
     rec.errorMessage = message;
-    rec.summary = QStringLiteral("Legacy 发送（%1）").arg(recordStatusName(status));
+    rec.summary = QStringLiteral("Legacy 发送（%1）").arg(recordStatusDisplayName(status));
     emit recordReceived(rec);
 }
 

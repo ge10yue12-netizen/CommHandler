@@ -14,13 +14,13 @@ class MainWindow : public QMainWindow
     Q_OBJECT
 
 public:
-    // 初始化界面并挂接串口/UDP 收包槽
+    // 初始化界面并挂接串口/网口收包槽
     explicit MainWindow(QWidget* parent = nullptr);
-    // 关闭串口与 UDP 后析构
+    // 关闭通道后析构
     ~MainWindow() override;
 
 private slots:
-    // 按当前通道打开串口或绑定 UDP
+    // 按当前通道打开串口或网口（TCP/UDP）
     void onOpenClicked();
     // 关闭当前通道
     void onCloseClicked();
@@ -36,10 +36,16 @@ private slots:
     void onCmdZero();
     // 串口收字节：记 HEX，并按协议解析软件回传
     void onSerialBytesReceived(QByteArray bytes);
-    // UDP 收报文：记原文/HEX，并按协议解析软件回传
+    // 网口收报文：记原文/HEX，并按协议解析软件回传
     void onNetworkDatagramReceived(QByteArray datagram);
+    // TCP 对端已连接
+    void onNetworkPeerConnected(QString endpoint);
+    // TCP 对端已断开
+    void onNetworkPeerDisconnected();
     // 通道切换时刷新协议列表与面板
     void onChannelChanged(int);
+    // 传输类型变化时刷新角色使能
+    void onTransferChanged(int);
 
 private:
     // 收发区追加带时戳日志

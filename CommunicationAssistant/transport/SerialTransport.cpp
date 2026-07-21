@@ -62,11 +62,12 @@ Result SerialTransport::open(const TransportConfig& config)
     port_.setStopBits(stopBits);
     port_.setFlowControl(QSerialPort::NoFlowControl);
 
-    if (!port_.open(QIODevice::ReadWrite)) {
+    if (!port_.open(QIODevice::ReadWrite) || !port_.isOpen()) {
         const QString msg = port_.errorString();
         port_.clearError();
         setState(TransportState::Closed);
-        return Result::fail(QStringLiteral("serial_open_failed"), msg);
+        return Result::fail(QStringLiteral("serial_open_failed"),
+                            msg.isEmpty() ? QStringLiteral("串口打开失败") : msg);
     }
 
     setState(TransportState::Open);

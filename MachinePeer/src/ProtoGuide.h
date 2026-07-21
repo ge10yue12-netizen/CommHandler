@@ -34,8 +34,9 @@ inline void fillSerialCombos(QComboBox* baud, QComboBox* dataBits, QComboBox* pa
     dataBits->clear();
     dataBits->addItem(QStringLiteral("5"), 0);
     dataBits->addItem(QStringLiteral("6"), 1);
+    dataBits->addItem(QStringLiteral("7"), 2);
     dataBits->addItem(QStringLiteral("8"), 3);
-    dataBits->setCurrentIndex(2);
+    dataBits->setCurrentIndex(3);
     parity->clear();
     parity->addItems({QStringLiteral("N"), QStringLiteral("E"), QStringLiteral("O"), QStringLiteral("S"),
                       QStringLiteral("M")});

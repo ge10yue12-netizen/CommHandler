@@ -1,11 +1,15 @@
-// ProtocolTests.cpp — MachinePeer 全部串口/网口协议黄金帧验证
+// ProtocolTests.cpp — MachinePeer 协议黄金帧 + TCP/UDP 通道连通自检
 #include "../src/NetworkProtocol.h"
+#include "../src/PeerChannelManager.h"
 #include "../src/SerialProtocol.h"
 
 #include <QCoreApplication>
+#include <QEventLoop>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QTextStream>
+#include <QTimer>
+#include <array>
 #include <cmath>
 #include <cstring>
 
@@ -206,14 +210,99 @@ void testNetworkProtocols()
           QStringLiteral("网口 PT7 回包"));
 }
 
+// 验证 PeerChannelManager TCP 服务端↔客户端环回（对齐助手 TCP 客户端连试验机服务端）
+void testPeerChannelTcpLoopback()
+{
+    PeerChannelManager server;
+    PeerNetworkSettings serverSettings;
+    serverSettings.localIp = QStringLiteral("127.0.0.1");
+    serverSettings.localPort = 19090;
+    serverSettings.destinationIp = QStringLiteral("127.0.0.1");
+    serverSettings.destinationPort = 19090;
+    serverSettings.transferType = 0;
+    serverSettings.model = 0;
+    QString error;
+    check(server.openNetwork(serverSettings, &error), QStringLiteral("TCP 服务端监听"));
+
+    bool peerConnected = false;
+    QObject::connect(&server, &PeerChannelManager::networkPeerConnected,
+                     [&peerConnected](const QString&) { peerConnected = true; });
+
+    QByteArray serverRx;
+    QObject::connect(&server, &PeerChannelManager::networkDatagramReceived,
+                     [&serverRx](const QByteArray& bytes) { serverRx.append(bytes); });
+
+    PeerChannelManager client;
+    PeerNetworkSettings clientSettings = serverSettings;
+    clientSettings.model = 1;
+    check(client.openNetwork(clientSettings, &error), QStringLiteral("TCP 客户端连接"));
+
+    QEventLoop loop;
+    QTimer::singleShot(150, &loop, &QEventLoop::quit);
+    loop.exec();
+    check(peerConnected, QStringLiteral("TCP 服务端收到连接"));
+
+    check(client.sendNetwork(QByteArray("HELLO"), &error), QStringLiteral("TCP 客户端发送"));
+    QTimer::singleShot(150, &loop, &QEventLoop::quit);
+    loop.exec();
+    check(serverRx == QByteArray("HELLO"), QStringLiteral("TCP 服务端收包"));
+
+    QByteArray clientRx;
+    QObject::connect(&client, &PeerChannelManager::networkDatagramReceived,
+                     [&clientRx](const QByteArray& bytes) { clientRx.append(bytes); });
+    check(server.sendNetwork(QByteArray("ACK"), &error), QStringLiteral("TCP 服务端发送"));
+    QTimer::singleShot(150, &loop, &QEventLoop::quit);
+    loop.exec();
+    check(clientRx == QByteArray("ACK"), QStringLiteral("TCP 客户端收包"));
+
+    server.close();
+    client.close();
+}
+
+// 验证 PeerChannelManager UDP 绑定与交叉端口收发
+void testPeerChannelUdpLoopback()
+{
+    PeerChannelManager peerA;
+    PeerNetworkSettings settingsA;
+    settingsA.localIp = QStringLiteral("127.0.0.1");
+    settingsA.localPort = 19116;
+    settingsA.destinationIp = QStringLiteral("127.0.0.1");
+    settingsA.destinationPort = 19115;
+    settingsA.transferType = 1;
+    settingsA.model = 0;
+    QString error;
+    check(peerA.openNetwork(settingsA, &error), QStringLiteral("UDP A 绑定"));
+
+    PeerChannelManager peerB;
+    PeerNetworkSettings settingsB = settingsA;
+    settingsB.localPort = 19115;
+    settingsB.destinationPort = 19116;
+    check(peerB.openNetwork(settingsB, &error), QStringLiteral("UDP B 绑定"));
+
+    QByteArray rxB;
+    QObject::connect(&peerB, &PeerChannelManager::networkDatagramReceived,
+                     [&rxB](const QByteArray& bytes) { rxB.append(bytes); });
+
+    check(peerA.sendNetwork(QByteArray("UDPPING"), &error), QStringLiteral("UDP A 发送"));
+    QEventLoop loop;
+    QTimer::singleShot(150, &loop, &QEventLoop::quit);
+    loop.exec();
+    check(rxB == QByteArray("UDPPING"), QStringLiteral("UDP B 收包"));
+
+    peerA.close();
+    peerB.close();
+}
+
 } // namespace
 
-// 运行全部协议黄金帧测试
+// 运行全部协议黄金帧与通道连通测试
 int main(int argc, char* argv[])
 {
     QCoreApplication application(argc, argv);
     testSerialProtocols();
     testNetworkProtocols();
+    testPeerChannelTcpLoopback();
+    testPeerChannelUdpLoopback();
     QTextStream(stdout) << "TOTAL_FAILURES " << g_failures << Qt::endl;
     return g_failures == 0 ? 0 : 1;
 }

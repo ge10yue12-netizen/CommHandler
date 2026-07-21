@@ -46,8 +46,8 @@ static void put(LegacyCapabilityProfile* p, LegacyCapability c, bool s, const QS
 
 static void setRawAlwaysOff(LegacyCapabilityProfile* p)
 {
-    put(p, LegacyCapability::RawReceive, false, QStringLiteral("Legacy 恒不支持原始抓包"));
-    put(p, LegacyCapability::RawSend, false, QStringLiteral("Legacy 恒不支持原始发送"));
+    put(p, LegacyCapability::RawReceive, false, QStringLiteral("兼容动态库不支持原始抓包"));
+    put(p, LegacyCapability::RawSend, false, QStringLiteral("兼容动态库不支持原始发送"));
     put(p, LegacyCapability::RequiresPollingPermission, false);
     put(p, LegacyCapability::RequiresStreamingState, false);
 }
@@ -84,9 +84,11 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
             break;
         case 3:
             put(&p, LegacyCapability::ReceiveValues, true);
-            put(&p, LegacyCapability::ReceiveControlEvents, false, QStringLiteral("三思控制事件未验证→不支持"));
+            put(&p, LegacyCapability::ReceiveControlEvents, false, QStringLiteral("三思控制事件未经验证，按不支持处理"));
             put(&p, LegacyCapability::ReceiveParameterEvents, false);
-            put(&p, LegacyCapability::SendEncodedValues, false);
+            // 对齐 SocketComm::SendData：无 case 3，数值发送不会写出线帧
+            put(&p, LegacyCapability::SendEncodedValues, false,
+                QStringLiteral("动态库 SendData(vector) 未实现网口三思编码分支"));
             put(&p, LegacyCapability::SendTransparentText, false);
             break;
         case 4:
@@ -94,14 +96,14 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
             put(&p, LegacyCapability::ReceiveControlEvents, true);
             put(&p, LegacyCapability::ReceiveParameterEvents, true);
             put(&p, LegacyCapability::SendEncodedValues, false);
-            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("触发存图文本未验证→不支持"));
+            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("触发存图透明文本未经验证，按不支持处理"));
             break;
         case 5:
             put(&p, LegacyCapability::ReceiveValues, true);
             put(&p, LegacyCapability::ReceiveControlEvents, false);
             put(&p, LegacyCapability::ReceiveParameterEvents, false);
             put(&p, LegacyCapability::SendEncodedValues, false);
-            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("福建威盛文本未验证→不支持"));
+            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("福建威盛透明文本未经验证，按不支持处理"));
             break;
         case 6:
             put(&p, LegacyCapability::ReceiveValues, false);
@@ -111,10 +113,13 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
             put(&p, LegacyCapability::SendTransparentText, true);
             break;
         case 7:
-            put(&p, LegacyCapability::ReceiveValues, false);
+            put(&p, LegacyCapability::ReceiveValues, false,
+                QStringLiteral("纳百川线条收路径为控制/标距事件，不产生数值通道"));
             put(&p, LegacyCapability::ReceiveControlEvents, true);
             put(&p, LegacyCapability::ReceiveParameterEvents, true);
-            put(&p, LegacyCapability::SendEncodedValues, false, QStringLiteral("需 4 值数值发送未验证→不支持"));
+            // 对齐 SocketComm::GenJsonDocument：要求恰好 4 个 double
+            put(&p, LegacyCapability::SendEncodedValues, true, QString(),
+                QStringLiteral("恰好 4 个数值（L1,b1,Le1,bo1）；收侧不回显数值通道"));
             put(&p, LegacyCapability::SendTransparentText, true);
             break;
         case 8:
@@ -147,15 +152,22 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
         put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("SendData(QString) 空实现"));
         break;
     case 1:
-        put(&p, LegacyCapability::ReceiveValues, true);
-        put(&p, LegacyCapability::ReceiveControlEvents, false, QStringLiteral("串口1控制事件待验证→不支持"));
+        // 收：仅力值 1 路；发：仅编码 vData[0]；控制字 {QLI[1]}/{QLI[2]} 上报开始/停止
+        put(&p, LegacyCapability::ReceiveValues, true, QString(),
+            QStringLiteral("收 1 路力值；发送仅取 CSV 第 1 个数值（14 字节 02 4C…#）"));
+        put(&p, LegacyCapability::ReceiveControlEvents, true, QString(),
+            QStringLiteral("{QLI[1]} 开始 / {QLI[2]} 停止"));
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
-        put(&p, LegacyCapability::SendEncodedValues, true);
+        put(&p, LegacyCapability::SendEncodedValues, true, QString(),
+            QStringLiteral("仅第 1 个数值写入线帧"));
         put(&p, LegacyCapability::SendTransparentText, false);
         break;
     case 2:
-        put(&p, LegacyCapability::ReceiveValues, true);
-        put(&p, LegacyCapability::ReceiveControlEvents, false);
+        // 时代新材：value,num,TYPE,flag；库只取 parts[0]
+        put(&p, LegacyCapability::ReceiveValues, true, QString(),
+            QStringLiteral("收 1 路（CSV 第 1 段）；第 2 段为设备序号非测量通道"));
+        put(&p, LegacyCapability::ReceiveControlEvents, false,
+            QStringLiteral("时代新材库无独立控制事件分支"));
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
         put(&p, LegacyCapability::SendEncodedValues, false);
         put(&p, LegacyCapability::SendTransparentText, false);

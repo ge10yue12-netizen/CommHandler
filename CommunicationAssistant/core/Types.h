@@ -69,7 +69,7 @@ enum class RecordStatus
     Cancelled
 };
 
-// 日志与 UI 展示用英文枚举名，避免翻译导致测试 Golden 漂移
+// Capture JSON / 自测用英文枚举名，避免翻译导致 Golden 漂移
 inline QString recordKindName(RecordKind kind)
 {
     switch (kind) {
@@ -96,6 +96,45 @@ inline QString recordStatusName(RecordStatus status)
     case RecordStatus::Cancelled: return QStringLiteral("Cancelled");
     }
     return QStringLiteral("UnknownStatus");
+}
+
+// UI 日志展示用中文名（不写入 Capture JSON）
+inline QString recordKindDisplayName(RecordKind kind)
+{
+    switch (kind) {
+    case RecordKind::RawChunk: return QStringLiteral("原始数据");
+    case RecordKind::UdpDatagram: return QStringLiteral("UDP数据报");
+    case RecordKind::ProtocolFrame: return QStringLiteral("协议帧");
+    case RecordKind::LegacyValueEvent: return QStringLiteral("Legacy数值");
+    case RecordKind::LegacyControlEvent: return QStringLiteral("Legacy控制");
+    case RecordKind::LegacyParameterEvent: return QStringLiteral("Legacy参数");
+    case RecordKind::ConnectionEvent: return QStringLiteral("连接事件");
+    case RecordKind::ErrorEvent: return QStringLiteral("错误事件");
+    }
+    return QStringLiteral("未知类型");
+}
+
+inline QString recordStatusDisplayName(RecordStatus status)
+{
+    switch (status) {
+    case RecordStatus::Observed: return QStringLiteral("已观测");
+    case RecordStatus::Queued: return QStringLiteral("已排队");
+    case RecordStatus::Submitted: return QStringLiteral("已提交");
+    case RecordStatus::Completed: return QStringLiteral("已完成");
+    case RecordStatus::Failed: return QStringLiteral("失败");
+    case RecordStatus::Cancelled: return QStringLiteral("已取消");
+    }
+    return QStringLiteral("未知状态");
+}
+
+inline QString directionDisplayName(Direction direction)
+{
+    switch (direction) {
+    case Direction::Tx: return QStringLiteral("发送");
+    case Direction::Rx: return QStringLiteral("接收");
+    case Direction::System: return QStringLiteral("系统");
+    }
+    return QStringLiteral("未知方向");
 }
 
 } // namespace ca

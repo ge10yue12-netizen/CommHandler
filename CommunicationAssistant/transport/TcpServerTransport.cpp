@@ -40,8 +40,9 @@ Result TcpServerTransport::open(const TransportConfig& config)
         return Result::fail(QStringLiteral("invalid_address"), QStringLiteral("监听地址无效"));
     }
 
-    if (!server_.listen(host, port)) {
+    if (!server_.listen(host, port) || !server_.isListening()) {
         const QString msg = server_.errorString();
+        server_.close();
         setState(TransportState::Closed);
         return Result::fail(QStringLiteral("tcp_listen_failed"), msg.isEmpty() ? QStringLiteral("监听失败") : msg);
     }

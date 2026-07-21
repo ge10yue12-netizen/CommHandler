@@ -30,6 +30,7 @@ void LegacyWorker::bindBackendSignals()
     connect(backend_, &ILegacyBackend::valuesReceived, this, &LegacyWorker::valuesReceived);
     connect(backend_, &ILegacyBackend::controlEvent, this, &LegacyWorker::controlEvent);
     connect(backend_, &ILegacyBackend::parameterEvent, this, &LegacyWorker::parameterEvent);
+    connect(backend_, &ILegacyBackend::unparsedRx, this, &LegacyWorker::unparsedRx);
     connect(backend_, &ILegacyBackend::backendError, this, &LegacyWorker::backendError);
     connect(backend_, &ILegacyBackend::disconnected, this, &LegacyWorker::disconnected);
 }

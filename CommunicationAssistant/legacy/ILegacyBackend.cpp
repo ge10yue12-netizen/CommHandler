@@ -43,11 +43,13 @@ int baudIndexFromRate(int baud)
     }
 }
 
+// 数据位 → iDataBits：0=5 1=6 2=7 3=8（与 SerialPortComm / UIDef 一致）
 int dataBitsIndexFromValue(int bits)
 {
     switch (bits) {
     case 5: return 0;
     case 6: return 1;
+    case 7: return 2;
     case 8: return 3;
     default: return 3;
     }
@@ -184,6 +186,8 @@ Result CommHandlerBackend::configure(const LegacyConfig& config)
     connect(h, &CommHandler::emitEventMsg, this, &CommHandlerBackend::onEmitEventMsg, Qt::DirectConnection);
     connect(h, &CommHandler::emitEventMsgAndData, this, &CommHandlerBackend::onEmitEventMsgAndData,
             Qt::DirectConnection);
+    connect(h, &CommHandler::emitUnparsedRx, this, &CommHandlerBackend::onEmitUnparsedRx,
+            Qt::DirectConnection);
     connect(h, &CommHandler::emitClientDisConn, this, &CommHandlerBackend::onClientDisconnected,
             Qt::DirectConnection);
 
@@ -280,8 +284,12 @@ Result CommHandlerBackend::connectDevice()
     if (!handler_)
         return Result::fail(QStringLiteral("not_configured"), QStringLiteral("请先 configure"));
     CommHandler* h = static_cast<CommHandler*>(handler_);
-    if (!h->Connect(-1))
-        return Result::fail(QStringLiteral("legacy_connect_failed"), QStringLiteral("CommHandler Connect 失败"));
+    if (!h->Connect(-1)) {
+        connected_ = false;
+        // 客户端被拒/超时、串口打不开、UDP bind 失败等均走此分支
+        return Result::fail(QStringLiteral("legacy_connect_failed"),
+                            QStringLiteral("连接失败：对端拒绝、超时、地址/端口无效或串口无法打开"));
+    }
     connected_ = true;
     return Result::success();
 #endif
@@ -352,6 +360,15 @@ void CommHandlerBackend::onEmitEventMsgAndData(const int& ctrlCmd, const int& vi
                                                const QVariantMap& extra)
 {
     emit parameterEvent(ctrlCmd, viewId, msg, extra);
+}
+
+void CommHandlerBackend::onEmitUnparsedRx(const QByteArray& raw)
+{
+    // Direct：立刻拷贝字节，禁止持有 DLL 缓冲；超长截断防 Worker 队列膨胀
+    if (raw.isEmpty())
+        return;
+    QByteArray owned = (raw.size() > kMaxUnparsedBytes) ? raw.left(kMaxUnparsedBytes) : QByteArray(raw);
+    emit unparsedRx(owned);
 }
 
 void CommHandlerBackend::onClientDisconnected()

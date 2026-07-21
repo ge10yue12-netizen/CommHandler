@@ -37,8 +37,10 @@ Result UdpTransport::open(const TransportConfig& config)
         mode |= QUdpSocket::ShareAddress | QUdpSocket::ReuseAddressHint;
 
     const QHostAddress host(addr);
-    if (!socket_.bind(host, port, mode)) {
+    if (!socket_.bind(host, port, mode)
+        || socket_.state() != QAbstractSocket::BoundState) {
         const QString msg = socket_.errorString();
+        socket_.close();
         setState(TransportState::Closed);
         return Result::fail(QStringLiteral("udp_bind_failed"),
                             msg.isEmpty() ? QStringLiteral("UDP 绑定失败") : msg);

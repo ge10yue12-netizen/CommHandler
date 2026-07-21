@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 编译前校验 ui/MainWindow.ui 与 C++ 绑定合同，避免 Designer 手改后出现 C2039 -->
+<Project>
+  <Target Name="CheckUiContract"
+          BeforeTargets="QtUic;ClCompile"
+          Condition="Exists('$(ProjectDir)tools\check_ui_contract.ps1')">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectDir)tools\check_ui_contract.ps1&quot; -UiPath &quot;$(ProjectDir)ui\MainWindow.ui&quot; -ContractPath &quot;$(ProjectDir)tools\ui_contract.txt&quot;"
+          IgnoreExitCode="false" />
+  </Target>
+</Project>

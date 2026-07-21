@@ -1,0 +1,162 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{B99685A9-1CA4-4AD4-A900-371E31CD2737}</ProjectGuid>
+    <Keyword>QtVS_v304</Keyword>
+    <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">10.0.19041.0</WindowsTargetPlatformVersion>
+    <WindowsTargetPlatformVersion Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">10.0.19041.0</WindowsTargetPlatformVersion>
+    <QtMsBuild Condition="'$(QtMsBuild)'=='' OR !Exists('$(QtMsBuild)\qt.targets')">$(MSBuildProjectDirectory)\QtMsBuild</QtMsBuild>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <PlatformToolset>v142</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Condition="Exists('$(QtMsBuild)\qt_defaults.props')">
+    <Import Project="$(QtMsBuild)\qt_defaults.props" />
+  </ImportGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="QtSettings">
+    <QtInstall>msvc2019_64</QtInstall>
+    <QtModules>core;network;serialport</QtModules>
+    <QtBuildConfig>debug</QtBuildConfig>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="QtSettings">
+    <QtInstall>msvc2019_64</QtInstall>
+    <QtModules>core;network;serialport</QtModules>
+    <QtBuildConfig>release</QtBuildConfig>
+  </PropertyGroup>
+  <Target Name="QtMsBuildNotFound" BeforeTargets="CustomBuild;ClCompile" Condition="!Exists('$(QtMsBuild)\qt.targets') or !Exists('$(QtMsBuild)\qt.props')">
+    <Message Importance="High" Text="QtMsBuild: could not locate qt.targets, qt.props; project may not build correctly." />
+  </Target>
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(QtMsBuild)\Qt.props" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+    <Import Project="$(QtMsBuild)\Qt.props" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <AdditionalIncludeDirectories>.\CommSdk;.\CommSdk\voltage;.\Common;.\Protocol;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
+    <Link>
+      <AdditionalDependencies>pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.lib;pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.lib;voltage\ART_DAQ\Art_DAQ.lib;voltage\ART_NET5640\lib\Art_DAQ_64.lib;voltage\NI_DAQ\lib64\NIDAQmx.lib;voltage\NI_DAQ\lib64\nisyscfg.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>.\CommSdk;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <LanguageStandard>stdcpp17</LanguageStandard>
+      <AdditionalIncludeDirectories>.\CommSdk;.\CommSdk\voltage;.\Common;.\Protocol;%(AdditionalIncludeDirectories);$(Qt_INCLUDEPATH_)</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <AdditionalLibraryDirectories>.\CommSdk;</AdditionalLibraryDirectories>
+      <AdditionalDependencies>pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.lib;pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.lib;voltage\ART_DAQ\Art_DAQ.lib;voltage\ART_NET5640\lib\Art_DAQ_64.lib;voltage\NI_DAQ\lib64\NIDAQmx.lib;voltage\NI_DAQ\lib64\nisyscfg.lib;%(AdditionalDependencies);$(Qt_LIBS_)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'" Label="Configuration">
+    <ClCompile>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <Optimization>Disabled</Optimization>
+      <PreprocessorDefinitions>COMMHANDLER_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'" Label="Configuration">
+    <ClCompile>
+      <TreatWChar_tAsBuiltInType>true</TreatWChar_tAsBuiltInType>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <DebugInformationFormat>None</DebugInformationFormat>
+      <Optimization>MaxSpeed</Optimization>
+      <PreprocessorDefinitions>COMMHANDLER_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="CommSdk\network\NetworkBox.cpp" />
+    <ClCompile Include="CommSdk\network\tcpserver.cpp" />
+    <ClCompile Include="CommSdk\network\tcpsocket.cpp" />
+    <ClCompile Include="CommSdk\network\udpsocket.cpp" />
+    <ClCompile Include="CommSdk\PulseComm.cpp" />
+    <ClCompile Include="CommSdk\SerialPortComm.cpp" />
+    <ClCompile Include="CommSdk\SocketComm.cpp" />
+    <ClCompile Include="CommSdk\VoltageComm.cpp" />
+    <ClCompile Include="CommSdk\voltage\ART_DAQ\ART_ArtDAQ.cpp" />
+    <ClCompile Include="CommSdk\voltage\ART_NET5640\ART_ARTNET5640.cpp" />
+    <ClCompile Include="CommSdk\voltage\NI_DAQ\NI_DAQ.cpp" />
+    <ClCompile Include="CommSdk\voltage\VoltageBox.cpp" />
+    <ClCompile Include="Protocol\Serial\SerLhgkProtocol.cpp" />
+    <ClCompile Include="Protocol\Socket\NetLhgkProtocol.cpp" />
+    <ClInclude Include="Common\Singleton.h" />
+    <ClInclude Include="Common\utils\TimeUtils.h" />
+    <ClInclude Include="Common\Any.h" />
+    <ClInclude Include="Protocol\Serial\SerLhgkProtocol.h" />
+    <ClInclude Include="Protocol\Socket\NetLhgkProtocol.h" />
+    <QtMoc Include="CommSdk\CommBase.h" />
+    <ClInclude Include="CommSdk\pulse\AMCXXE\NET_AMC3XER\NET_AMC3XER.h" />
+    <ClInclude Include="CommSdk\pulse\AMCXXE\USB_AMC2XE\Usb_AMC2XE_Dll.h" />
+    <QtMoc Include="CommSdk\PulseComm.h" />
+    <QtMoc Include="CommSdk\SerialPortComm.h" />
+    <QtMoc Include="CommSdk\SocketComm.h" />
+    <ClInclude Include="Common\UIDef.h" />
+    <QtMoc Include="CommSdk\VoltageComm.h" />
+    <ClInclude Include="CommSdk\voltage\ARTBase.h" />
+    <ClInclude Include="CommSdk\voltage\ART_DAQ\ART_ArtDAQ.h" />
+    <ClInclude Include="CommSdk\voltage\ART_DAQ\Art_DAQ.h" />
+    <ClInclude Include="CommSdk\voltage\ART_NET5640\ART_ARTNET5640.h" />
+    <ClInclude Include="CommSdk\voltage\ART_NET5640\include\Art_DAQ.h" />
+    <ClInclude Include="CommSdk\voltage\NI_DAQ\include\NIDAQmx.h" />
+    <ClInclude Include="CommSdk\voltage\NI_DAQ\include\nisyscfg.h" />
+    <ClInclude Include="CommSdk\voltage\NI_DAQ\include\nisyscfg_errors.h" />
+    <ClInclude Include="CommSdk\voltage\NI_DAQ\include\nisyscfg_wide.h" />
+    <ClInclude Include="CommSdk\voltage\NI_DAQ\NI_DAQ.h" />
+    <ClInclude Include="CommSdk\voltage\VoltageBox.h" />
+    <QtMoc Include="CommSdk\network\udpsocket.h" />
+    <QtMoc Include="CommSdk\network\tcpsocket.h" />
+    <QtMoc Include="CommSdk\network\tcpserver.h" />
+    <QtMoc Include="CommSdk\network\NetworkBox.h" />
+    <QtMoc Include="CommSdk\network\NetworkBase.h" />
+    <QtMoc Include="CommHandler.h" />
+    <ClCompile Include="CommHandler.cpp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Condition="Exists('$(QtMsBuild)\qt.targets')">
+    <Import Project="$(QtMsBuild)\qt.targets" />
+  </ImportGroup>
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

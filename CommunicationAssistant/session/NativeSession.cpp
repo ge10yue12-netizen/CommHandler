@@ -129,7 +129,15 @@ Result NativeSession::open()
     conn.direction = Direction::System;
     conn.wallTime = QDateTime::currentDateTimeUtc();
     conn.monotonicNs = monotonicNsNow();
-    conn.summary = QStringLiteral("已连接 %1").arg(endpointSummary());
+    // 按传输就绪语义写摘要（协议解析与是否连通无关）
+    if (activeKind_ == TransportKind::TcpServer)
+        conn.summary = QStringLiteral("已监听 %1").arg(endpointSummary());
+    else if (activeKind_ == TransportKind::Udp)
+        conn.summary = QStringLiteral("已绑定 %1").arg(endpointSummary());
+    else if (activeKind_ == TransportKind::Serial)
+        conn.summary = QStringLiteral("串口已打开 %1").arg(endpointSummary());
+    else
+        conn.summary = QStringLiteral("已连接 %1").arg(endpointSummary());
     conn.localEndpoint.address = endpointSummary();
     emit recordReceived(conn);
     return Result::success();
@@ -376,15 +384,15 @@ CommRecord NativeSession::makeTxRecord(const SendRequest& request, RecordStatus 
     if (request.broadcast || (activeKind_ == TransportKind::TcpServer && request.channelId.isEmpty()))
         rec.summary = QStringLiteral("广播发送 %1 字节（%2）")
                           .arg(request.payload.size())
-                          .arg(recordStatusName(status));
+                          .arg(recordStatusDisplayName(status));
     else if (activeKind_ == TransportKind::Udp)
         rec.summary = QStringLiteral("UDP 发包 %1 字节（%2）")
                           .arg(request.payload.size())
-                          .arg(recordStatusName(status));
+                          .arg(recordStatusDisplayName(status));
     else
         rec.summary = QStringLiteral("发送 %1 字节（%2）")
                           .arg(request.payload.size())
-                          .arg(recordStatusName(status));
+                          .arg(recordStatusDisplayName(status));
     rec.localEndpoint.address = endpointSummary();
     if (activeKind_ == TransportKind::Udp) {
         rec.localEndpoint.address = claim_.localAddress.isEmpty() ? QStringLiteral("0.0.0.0") : claim_.localAddress;

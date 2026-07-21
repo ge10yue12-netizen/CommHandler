@@ -91,11 +91,19 @@ private:
     void refreshClientCombo();
     void refreshLegacyCapabilityTips();
     void updateSendPlaceholders();
+    // 十六进制发送勾选优先：禁用以太网 Legacy 模式下拉，避免双源冲突
+    void updateSendFormatMutex();
+    // 已连接时修改工作模式/连接参数：关闭后按新配置自动重开
+    void requestApplyConnectedConfig(const QString& reason);
+    // 按当前 UI 配置打开会话（供首次打开与热重连共用）
+    void openWithCurrentUiConfig();
     bool isLegacyMode() const;
     // 接收显示是否为 HEX（否则文本）
     bool preferHexDisplay() const;
-    // Native 发送是否按 HEX 解析（否则文本）
+    // 十六进制发送勾选（Native 解析 HEX；Legacy 勾选则边界拒绝并写日志）
     bool preferHexSend() const;
+    // 当前 Legacy 协议显示名（如「串口 0 三思」）
+    QString currentLegacyProtocolLabel() const;
     ca::ICommSession* activeSession();
     const ca::ICommSession* activeSession() const;
     ca::SessionConfig buildConfig() const;
@@ -162,6 +170,9 @@ private:
     QSpinBox* legacyRemotePortSpin_ = nullptr;
     QComboBox* legacyPortCombo_ = nullptr;
     QComboBox* legacyBaudCombo_ = nullptr;
+    QComboBox* legacyDataBitsCombo_ = nullptr;
+    QComboBox* legacyParityCombo_ = nullptr;
+    QComboBox* legacyStopBitsCombo_ = nullptr;
     QCheckBox* legacyMockCheck_ = nullptr;
     QLabel* legacyCapTipLabel_ = nullptr;
 
@@ -206,7 +217,10 @@ private:
     QPushButton* btnResetCount_ = nullptr;
 
     ca::SessionState lastSessionState_ = ca::SessionState::Created;
+    // 连接中改配置：先异步关闭，Closed 后再按 UI 重开
+    bool pendingReopenAfterConfig_ = false;
     quint64 txBytes_ = 0;
     quint64 rxBytes_ = 0;
     quint64 rxChunks_ = 0;
+    qint64 lastRxMs_ = 0; // 0=从未收到；UTC epoch ms
 };

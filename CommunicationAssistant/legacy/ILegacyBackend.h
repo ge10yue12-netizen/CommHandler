@@ -36,6 +36,8 @@ signals:
     void valuesReceived(const QVector<double>& values, int type);
     void controlEvent(int ctrlCmd, int viewId, int msg);
     void parameterEvent(int ctrlCmd, int viewId, int msg, const QVariantMap& extra);
+    // DLL 上报：有进线字节但当前协议未解出业务数据
+    void unparsedRx(const QByteArray& raw);
     void backendError(const QString& code, const QString& message);
     void disconnected();
 };
@@ -86,6 +88,7 @@ private slots:
     void onEmitEventMsg(int ctrlCmd, int viewId, int msg);
     void onEmitEventMsgAndData(const int& ctrlCmd, const int& viewId, const int& msg,
                                const QVariantMap& extra);
+    void onEmitUnparsedRx(const QByteArray& raw);
     void onClientDisconnected();
 
 private:

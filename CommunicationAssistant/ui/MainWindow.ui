@@ -106,6 +106,12 @@
         </item>
         <item>
          <layout class="QFormLayout" name="formConnect">
+          <property name="horizontalSpacing">
+           <number>4</number>
+          </property>
+          <property name="verticalSpacing">
+           <number>1</number>
+          </property>
           <property name="leftMargin">
            <number>0</number>
           </property>
@@ -117,12 +123,6 @@
           </property>
           <property name="bottomMargin">
            <number>0</number>
-          </property>
-          <property name="horizontalSpacing">
-           <number>4</number>
-          </property>
-          <property name="verticalSpacing">
-           <number>1</number>
           </property>
           <item row="0" column="0">
            <widget class="QLabel" name="secWorkMode">
@@ -142,31 +142,100 @@
            </widget>
           </item>
           <item row="1" column="1">
-           <widget class="QComboBox" name="transportCombo"/>
+           <widget class="QStackedWidget" name="connMethodStack">
+            <property name="sizePolicy">
+             <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+              <horstretch>0</horstretch>
+              <verstretch>0</verstretch>
+             </sizepolicy>
+            </property>
+            <property name="minimumSize">
+             <size>
+              <width>0</width>
+              <height>22</height>
+             </size>
+            </property>
+            <property name="maximumSize">
+             <size>
+              <width>16777215</width>
+              <height>24</height>
+             </size>
+            </property>
+            <widget class="QWidget" name="pageConnNative">
+             <layout class="QVBoxLayout" name="layConnNative">
+              <property name="spacing">
+               <number>0</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QComboBox" name="transportCombo"/>
+              </item>
+             </layout>
+            </widget>
+            <widget class="QWidget" name="pageConnLegacy">
+             <layout class="QVBoxLayout" name="layConnLegacy">
+              <property name="spacing">
+               <number>0</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QComboBox" name="legacyCommTypeCombo"/>
+              </item>
+             </layout>
+            </widget>
+           </widget>
           </item>
          </layout>
         </item>
         <item>
          <widget class="QStackedWidget" name="paramStack">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+           <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>280</height>
+           </size>
+          </property>
           <widget class="QWidget" name="pageSerial">
            <layout class="QFormLayout" name="formSerial">
-            <property name="leftMargin">
-             <number>0</number>
-            </property>
-            <property name="topMargin">
-             <number>0</number>
-            </property>
             <property name="horizontalSpacing">
              <number>4</number>
             </property>
             <property name="verticalSpacing">
              <number>1</number>
+            </property>
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
             </property>
             <property name="rightMargin">
              <number>0</number>
@@ -228,17 +297,17 @@
           </widget>
           <widget class="QWidget" name="pageTcpClient">
            <layout class="QFormLayout" name="formTcpClient">
-            <property name="leftMargin">
-             <number>0</number>
-            </property>
-            <property name="topMargin">
-             <number>0</number>
-            </property>
             <property name="horizontalSpacing">
              <number>4</number>
             </property>
             <property name="verticalSpacing">
              <number>1</number>
+            </property>
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
             </property>
             <property name="rightMargin">
              <number>0</number>
@@ -284,17 +353,17 @@
           </widget>
           <widget class="QWidget" name="pageTcpServer">
            <layout class="QFormLayout" name="formTcpServer">
-            <property name="leftMargin">
-             <number>0</number>
-            </property>
-            <property name="topMargin">
-             <number>0</number>
-            </property>
             <property name="horizontalSpacing">
              <number>4</number>
             </property>
             <property name="verticalSpacing">
              <number>1</number>
+            </property>
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
             </property>
             <property name="rightMargin">
              <number>0</number>
@@ -340,17 +409,17 @@
           </widget>
           <widget class="QWidget" name="pageUdp">
            <layout class="QFormLayout" name="formUdp">
-            <property name="leftMargin">
-             <number>0</number>
-            </property>
-            <property name="topMargin">
-             <number>0</number>
-            </property>
             <property name="horizontalSpacing">
              <number>4</number>
             </property>
             <property name="verticalSpacing">
              <number>1</number>
+            </property>
+            <property name="leftMargin">
+             <number>0</number>
+            </property>
+            <property name="topMargin">
+             <number>0</number>
             </property>
             <property name="rightMargin">
              <number>0</number>
@@ -429,18 +498,15 @@
            </layout>
           </widget>
           <widget class="QWidget" name="pageLegacy">
-           <layout class="QFormLayout" name="formLegacy">
+           <layout class="QVBoxLayout" name="layLegacyPage">
+            <property name="spacing">
+             <number>2</number>
+            </property>
             <property name="leftMargin">
              <number>0</number>
             </property>
             <property name="topMargin">
              <number>0</number>
-            </property>
-            <property name="horizontalSpacing">
-             <number>4</number>
-            </property>
-            <property name="verticalSpacing">
-             <number>1</number>
             </property>
             <property name="rightMargin">
              <number>0</number>
@@ -448,37 +514,66 @@
             <property name="bottomMargin">
              <number>0</number>
             </property>
-            <item row="0" column="0">
-             <widget class="QLabel" name="lblLegacyComm">
-              <property name="text">
-               <string>通信类型</string>
+            <item>
+             <layout class="QFormLayout" name="formLegacy">
+              <property name="horizontalSpacing">
+               <number>8</number>
               </property>
-             </widget>
-            </item>
-            <item row="0" column="1">
-             <widget class="QComboBox" name="legacyCommTypeCombo"/>
-            </item>
-            <item row="1" column="0">
-             <widget class="QLabel" name="lblLegacyProto">
-              <property name="text">
-               <string>协议</string>
+              <property name="verticalSpacing">
+               <number>2</number>
               </property>
-             </widget>
-            </item>
-            <item row="1" column="1">
-             <widget class="QComboBox" name="legacyProtocolCombo"/>
-            </item>
-            <item row="2" column="0">
-             <widget class="QLabel" name="lblLegacyEp">
-              <property name="text">
-               <string>端点</string>
+              <property name="leftMargin">
+               <number>0</number>
               </property>
-             </widget>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item row="0" column="0">
+               <widget class="QLabel" name="lblLegacyProto">
+                <property name="text">
+                 <string>协议</string>
+                </property>
+               </widget>
+              </item>
+              <item row="0" column="1">
+               <widget class="QComboBox" name="legacyProtocolCombo"/>
+              </item>
+             </layout>
             </item>
-            <item row="2" column="1">
+            <item>
              <widget class="QStackedWidget" name="legacyEndpointStack">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+                <horstretch>0</horstretch>
+                <verstretch>0</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
+               <size>
+                <width>0</width>
+                <height>168</height>
+               </size>
+              </property>
+              <property name="maximumSize">
+               <size>
+                <width>16777215</width>
+                <height>168</height>
+               </size>
+              </property>
               <widget class="QWidget" name="pageLegacyNet">
                <layout class="QFormLayout" name="formLegacyNet">
+                <property name="horizontalSpacing">
+                 <number>8</number>
+                </property>
+                <property name="verticalSpacing">
+                 <number>2</number>
+                </property>
                 <property name="leftMargin">
                  <number>0</number>
                 </property>
@@ -579,7 +674,10 @@
                </layout>
               </widget>
               <widget class="QWidget" name="pageLegacySerial">
-               <layout class="QFormLayout" name="formLegacySerial">
+               <layout class="QVBoxLayout" name="layLegacySerialPage">
+                <property name="spacing">
+                 <number>1</number>
+                </property>
                 <property name="leftMargin">
                  <number>0</number>
                 </property>
@@ -592,58 +690,99 @@
                 <property name="bottomMargin">
                  <number>0</number>
                 </property>
-                <item row="0" column="0">
-                 <widget class="QLabel" name="lblLegacyPort">
-                  <property name="text">
-                   <string>端口</string>
+                <item>
+                 <layout class="QFormLayout" name="formLegacySerial">
+                  <property name="horizontalSpacing">
+                   <number>8</number>
                   </property>
-                 </widget>
-                </item>
-                <item row="0" column="1">
-                 <widget class="QComboBox" name="legacyPortCombo"/>
-                </item>
-                <item row="1" column="0">
-                 <widget class="QLabel" name="lblLegacyBaud">
-                  <property name="text">
-                   <string>波特率</string>
+                  <property name="verticalSpacing">
+                   <number>2</number>
                   </property>
-                 </widget>
+                  <property name="leftMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="topMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="rightMargin">
+                   <number>0</number>
+                  </property>
+                  <property name="bottomMargin">
+                   <number>0</number>
+                  </property>
+                  <item row="0" column="0">
+                   <widget class="QLabel" name="lblLegacyPort">
+                    <property name="text">
+                     <string>端口</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="0" column="1">
+                   <widget class="QComboBox" name="legacyPortCombo"/>
+                  </item>
+                  <item row="1" column="0">
+                   <widget class="QLabel" name="lblLegacyBaud">
+                    <property name="text">
+                     <string>波特率</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="1" column="1">
+                   <widget class="QComboBox" name="legacyBaudCombo"/>
+                  </item>
+                  <item row="2" column="0">
+                   <widget class="QLabel" name="lblLegacyDataBits">
+                    <property name="text">
+                     <string>数据位</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="2" column="1">
+                   <widget class="QComboBox" name="legacyDataBitsCombo"/>
+                  </item>
+                  <item row="3" column="0">
+                   <widget class="QLabel" name="lblLegacyParity">
+                    <property name="text">
+                     <string>校验</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="3" column="1">
+                   <widget class="QComboBox" name="legacyParityCombo"/>
+                  </item>
+                  <item row="4" column="0">
+                   <widget class="QLabel" name="lblLegacyStopBits">
+                    <property name="text">
+                     <string>停止位</string>
+                    </property>
+                   </widget>
+                  </item>
+                  <item row="4" column="1">
+                   <widget class="QComboBox" name="legacyStopBitsCombo"/>
+                  </item>
+                 </layout>
                 </item>
-                <item row="1" column="1">
-                 <widget class="QComboBox" name="legacyBaudCombo"/>
+                <item>
+                 <spacer name="legacySerialEpSpacer">
+                  <property name="orientation">
+                   <enum>Qt::Vertical</enum>
+                  </property>
+                  <property name="sizeHint" stdset="0">
+                   <size>
+                    <width>1</width>
+                    <height>1</height>
+                   </size>
+                  </property>
+                 </spacer>
                 </item>
                </layout>
               </widget>
              </widget>
             </item>
-            <item row="3" column="0">
-             <widget class="QLabel" name="lblLegacyMockSpacer">
-              <property name="text">
-               <string/>
-              </property>
-             </widget>
-            </item>
-            <item row="3" column="1">
+            <item>
              <widget class="QCheckBox" name="legacyMockCheck">
               <property name="text">
-               <string>使用 Mock 后端（不调 DLL）</string>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="0">
-             <widget class="QLabel" name="lblLegacyCap">
-              <property name="text">
-               <string>能力</string>
-              </property>
-             </widget>
-            </item>
-            <item row="4" column="1">
-             <widget class="QLabel" name="legacyCapTipLabel">
-              <property name="text">
-               <string/>
-              </property>
-              <property name="wordWrap">
-               <bool>true</bool>
+               <string>使用模拟后端（不加载动态库）</string>
               </property>
              </widget>
             </item>
@@ -653,8 +792,30 @@
         </item>
         <item>
          <widget class="QPushButton" name="btnOpen">
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+    background-color: rgb(240, 240, 240);
+    color: black;
+    border: 1px solid gray;
+    border-radius: 4px;
+    padding: 5px;
+}
+
+QPushButton:checked {
+    background-color: rgb(0, 170, 0);
+    color: white;
+    border: 1px solid rgb(0, 120, 0);
+}
+
+QPushButton:pressed {
+    background-color: rgb(0, 140, 0);
+}</string>
+          </property>
           <property name="text">
            <string>打开连接</string>
+          </property>
+          <property name="checkable">
+           <bool>false</bool>
           </property>
          </widget>
         </item>
@@ -667,16 +828,26 @@
         </item>
         <item>
          <widget class="QLabel" name="clientSectionLabel">
+          <property name="visible">
+           <bool>false</bool>
+          </property>
           <property name="text">
            <string>已连接客户端</string>
           </property>
          </widget>
         </item>
         <item>
-         <widget class="QComboBox" name="clientCombo"/>
+         <widget class="QComboBox" name="clientCombo">
+          <property name="visible">
+           <bool>false</bool>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="btnDisconnectClient">
+          <property name="visible">
+           <bool>false</bool>
+          </property>
           <property name="text">
            <string>断开选中客户端</string>
           </property>
@@ -722,7 +893,7 @@
            <string>十六进制发送</string>
           </property>
           <property name="checked">
-           <bool>true</bool>
+           <bool>false</bool>
           </property>
          </widget>
         </item>
@@ -732,7 +903,33 @@
         <item>
          <widget class="QLabel" name="sendSideHint">
           <property name="text">
-           <string>载荷在下方「发送工作台」编辑</string>
+           <string>载荷在「发送工作台」编辑</string>
+          </property>
+          <property name="wordWrap">
+           <bool>true</bool>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="lblLegacyCap">
+          <property name="text">
+           <string>能力：</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QLabel" name="legacyCapTipLabel">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>108</height>
+           </size>
+          </property>
+          <property name="text">
+           <string/>
+          </property>
+          <property name="alignment">
+           <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
           </property>
           <property name="wordWrap">
            <bool>true</bool>
@@ -745,12 +942,12 @@
            <enum>Qt::Vertical</enum>
           </property>
           <property name="sizeType">
-           <enum>QSizePolicy::Expanding</enum>
+           <enum>QSizePolicy::Minimum</enum>
           </property>
           <property name="sizeHint" stdset="0">
            <size>
             <width>20</width>
-            <height>12</height>
+            <height>4</height>
            </size>
           </property>
          </spacer>
@@ -774,10 +971,9 @@
      </widget>
     </item>
     <item>
-     <widget class="QWidget" name="mainPanel">
-      <layout class="QVBoxLayout" name="mainLay">
+     <layout class="QVBoxLayout" name="mainLay" stretch="1,0,0">
       <property name="spacing">
-       <number>10</number>
+       <number>8</number>
       </property>
       <property name="leftMargin">
        <number>16</number>
@@ -793,6 +989,18 @@
       </property>
       <item>
        <widget class="QSplitter" name="panesSplitter">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+          <horstretch>0</horstretch>
+          <verstretch>1</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="minimumSize">
+         <size>
+          <width>0</width>
+          <height>220</height>
+         </size>
+        </property>
         <property name="orientation">
          <enum>Qt::Vertical</enum>
         </property>
@@ -871,259 +1079,305 @@
        </widget>
       </item>
       <item>
-       <widget class="QLabel" name="sendWorkbenchTitle">
-        <property name="text">
-         <string>发送工作台</string>
+       <layout class="QVBoxLayout" name="sendWorkbenchLay" stretch="0,1">
+        <property name="spacing">
+         <number>4</number>
         </property>
-       </widget>
-      </item>
-      <item>
-       <widget class="QTabWidget" name="sendTabs">
-        <property name="currentIndex">
+        <property name="leftMargin">
          <number>0</number>
         </property>
-        <property name="documentMode">
-         <bool>true</bool>
+        <property name="topMargin">
+         <number>0</number>
         </property>
-        <widget class="QWidget" name="tabSingle">
-         <attribute name="title">
-          <string>单条发送</string>
-         </attribute>
-         <layout class="QVBoxLayout" name="singleLay">
-          <property name="spacing">
-           <number>6</number>
+        <property name="rightMargin">
+         <number>0</number>
+        </property>
+        <property name="bottomMargin">
+         <number>0</number>
+        </property>
+        <item>
+         <widget class="QLabel" name="sendWorkbenchTitle">
+          <property name="text">
+           <string>发送工作台</string>
           </property>
-          <property name="leftMargin">
-           <number>8</number>
+         </widget>
+        </item>
+        <item>
+         <widget class="QTabWidget" name="sendTabs">
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>268</height>
+           </size>
           </property>
-          <property name="topMargin">
-           <number>8</number>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>268</height>
+           </size>
           </property>
-          <property name="rightMargin">
-           <number>8</number>
+          <property name="currentIndex">
+           <number>0</number>
           </property>
-          <property name="bottomMargin">
-           <number>8</number>
+          <property name="documentMode">
+           <bool>true</bool>
           </property>
-          <item>
-           <layout class="QHBoxLayout" name="sendRow" stretch="1,0">
+          <widget class="QWidget" name="tabSingle">
+           <attribute name="title">
+            <string>单条发送</string>
+           </attribute>
+           <layout class="QVBoxLayout" name="singleLay" stretch="1">
+            <property name="spacing">
+             <number>6</number>
+            </property>
+            <property name="leftMargin">
+             <number>8</number>
+            </property>
+            <property name="topMargin">
+             <number>8</number>
+            </property>
+            <property name="rightMargin">
+             <number>8</number>
+            </property>
+            <property name="bottomMargin">
+             <number>8</number>
+            </property>
             <item>
-             <widget class="QPlainTextEdit" name="sendEdit">
-              <property name="maximumSize">
+             <layout class="QHBoxLayout" name="sendRow" stretch="1,0">
+              <property name="spacing">
+               <number>8</number>
+              </property>
+              <item>
+               <widget class="QPlainTextEdit" name="sendEdit">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                  <horstretch>1</horstretch>
+                  <verstretch>1</verstretch>
+                 </sizepolicy>
+                </property>
+               </widget>
+              </item>
+              <item alignment="Qt::AlignTop">
+               <widget class="QPushButton" name="btnSend">
+                <property name="minimumSize">
+                 <size>
+                  <width>40</width>
+                  <height>36</height>
+                 </size>
+                </property>
+                <property name="toolTip">
+                 <string>发送当前内容</string>
+                </property>
+                <property name="text">
+                 <string>➤</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
+          </widget>
+          <widget class="QWidget" name="tabList">
+           <attribute name="title">
+            <string>发送列表</string>
+           </attribute>
+           <layout class="QVBoxLayout" name="listLay" stretch="0,1,0,0">
+            <property name="spacing">
+             <number>4</number>
+            </property>
+            <property name="leftMargin">
+             <number>8</number>
+            </property>
+            <property name="topMargin">
+             <number>6</number>
+            </property>
+            <property name="rightMargin">
+             <number>8</number>
+            </property>
+            <property name="bottomMargin">
+             <number>6</number>
+            </property>
+            <item>
+             <layout class="QHBoxLayout" name="toolRow">
+              <item>
+               <widget class="QPushButton" name="btnListAdd">
+                <property name="text">
+                 <string>添加</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnListRemove">
+                <property name="text">
+                 <string>删除选中</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnListImport">
+                <property name="text">
+                 <string>导入 txt/csv…</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnListExport">
+                <property name="text">
+                 <string>导出…</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnListSendSelected">
+                <property name="text">
+                 <string>发送启用行</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <spacer name="toolStretch">
+                <property name="orientation">
+                 <enum>Qt::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QTableWidget" name="sendListTable">
+              <property name="sizePolicy">
+               <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+                <horstretch>0</horstretch>
+                <verstretch>1</verstretch>
+               </sizepolicy>
+              </property>
+              <property name="minimumSize">
                <size>
-                <width>16777215</width>
-                <height>88</height>
+                <width>0</width>
+                <height>120</height>
                </size>
               </property>
+              <property name="selectionMode">
+               <enum>QAbstractItemView::ExtendedSelection</enum>
+              </property>
+              <property name="selectionBehavior">
+               <enum>QAbstractItemView::SelectRows</enum>
+              </property>
+              <property name="columnCount">
+               <number>5</number>
+              </property>
+              <column>
+               <property name="text">
+                <string>启用</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>名称</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>载荷</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>延时ms</string>
+               </property>
+              </column>
+              <column>
+               <property name="text">
+                <string>格式</string>
+               </property>
+              </column>
              </widget>
             </item>
             <item>
-             <widget class="QPushButton" name="btnSend">
-              <property name="toolTip">
-               <string>发送当前内容</string>
-              </property>
+             <layout class="QHBoxLayout" name="schedRow">
+              <item>
+               <widget class="QComboBox" name="schedModeCombo"/>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="schedIntervalSpin">
+                <property name="suffix">
+                 <string> ms 默认间隔</string>
+                </property>
+                <property name="maximum">
+                 <number>3600000</number>
+                </property>
+                <property name="value">
+                 <number>1000</number>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QSpinBox" name="schedCountSpin">
+                <property name="prefix">
+                 <string>次数 </string>
+                </property>
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <number>1000000</number>
+                </property>
+                <property name="value">
+                 <number>10</number>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnSchedStart">
+                <property name="text">
+                 <string>启动调度</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnSchedPause">
+                <property name="text">
+                 <string>暂停</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnSchedResume">
+                <property name="text">
+                 <string>继续</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btnSchedStop">
+                <property name="text">
+                 <string>停止</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <widget class="QLabel" name="listHint">
               <property name="text">
-               <string>➤</string>
+               <string>启用 | 名称 | 载荷 | 延时ms | 格式 · 「发送启用行」与调度只处理勾选行</string>
+              </property>
+              <property name="wordWrap">
+               <bool>false</bool>
               </property>
              </widget>
             </item>
            </layout>
-          </item>
-         </layout>
-        </widget>
-        <widget class="QWidget" name="tabList">
-         <attribute name="title">
-          <string>发送列表</string>
-         </attribute>
-         <layout class="QVBoxLayout" name="listLay" stretch="0,1,0,0">
-          <property name="spacing">
-           <number>6</number>
-          </property>
-          <property name="leftMargin">
-           <number>8</number>
-          </property>
-          <property name="topMargin">
-           <number>8</number>
-          </property>
-          <property name="rightMargin">
-           <number>8</number>
-          </property>
-          <property name="bottomMargin">
-           <number>8</number>
-          </property>
-          <item>
-           <layout class="QHBoxLayout" name="toolRow">
-            <item>
-             <widget class="QPushButton" name="btnListAdd">
-              <property name="text">
-               <string>添加</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnListRemove">
-              <property name="text">
-               <string>删除选中</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnListImport">
-              <property name="text">
-               <string>导入 txt/csv…</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnListExport">
-              <property name="text">
-               <string>导出…</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnListSendSelected">
-              <property name="text">
-               <string>发送选中行</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <spacer name="toolStretch">
-              <property name="orientation">
-               <enum>Qt::Horizontal</enum>
-              </property>
-              <property name="sizeHint" stdset="0">
-               <size>
-                <width>40</width>
-                <height>20</height>
-               </size>
-              </property>
-             </spacer>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="QTableWidget" name="sendListTable">
-            <property name="minimumSize">
-             <size>
-              <width>0</width>
-              <height>140</height>
-             </size>
-            </property>
-            <property name="selectionMode">
-             <enum>QAbstractItemView::ExtendedSelection</enum>
-            </property>
-            <property name="selectionBehavior">
-             <enum>QAbstractItemView::SelectRows</enum>
-            </property>
-            <property name="columnCount">
-             <number>5</number>
-            </property>
-            <column>
-             <property name="text">
-              <string>启用</string>
-             </property>
-            </column>
-            <column>
-             <property name="text">
-              <string>名称</string>
-             </property>
-            </column>
-            <column>
-             <property name="text">
-              <string>载荷</string>
-             </property>
-            </column>
-            <column>
-             <property name="text">
-              <string>延时ms</string>
-             </property>
-            </column>
-            <column>
-             <property name="text">
-              <string>格式</string>
-             </property>
-            </column>
-           </widget>
-          </item>
-          <item>
-           <layout class="QHBoxLayout" name="schedRow">
-            <item>
-             <widget class="QComboBox" name="schedModeCombo"/>
-            </item>
-            <item>
-             <widget class="QSpinBox" name="schedIntervalSpin">
-              <property name="suffix">
-               <string> ms 默认间隔</string>
-              </property>
-              <property name="maximum">
-               <number>3600000</number>
-              </property>
-              <property name="value">
-               <number>1000</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QSpinBox" name="schedCountSpin">
-              <property name="prefix">
-               <string>次数 </string>
-              </property>
-              <property name="minimum">
-               <number>1</number>
-              </property>
-              <property name="maximum">
-               <number>1000000</number>
-              </property>
-              <property name="value">
-               <number>10</number>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnSchedStart">
-              <property name="text">
-               <string>启动调度</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnSchedPause">
-              <property name="text">
-               <string>暂停</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnSchedResume">
-              <property name="text">
-               <string>继续</string>
-              </property>
-             </widget>
-            </item>
-            <item>
-             <widget class="QPushButton" name="btnSchedStop">
-              <property name="text">
-               <string>停止</string>
-              </property>
-             </widget>
-            </item>
-           </layout>
-          </item>
-          <item>
-           <widget class="QLabel" name="listHint">
-            <property name="text">
-             <string>列表列：启用 | 名称 | 载荷 | 延时ms | 格式。可用「导入」选择本机 .txt / .csv。</string>
-            </property>
-            <property name="wordWrap">
-             <bool>true</bool>
-            </property>
-           </widget>
-          </item>
-         </layout>
-        </widget>
-       </widget>
+          </widget>
+         </widget>
+        </item>
+       </layout>
       </item>
       <item>
        <layout class="QHBoxLayout" name="footer">
@@ -1179,8 +1433,7 @@
         </item>
        </layout>
       </item>
-      </layout>
-     </widget>
+     </layout>
     </item>
    </layout>
   </widget>

@@ -187,5 +187,7 @@ exit /B 0
   </ImportGroup>
   <!-- 覆盖 Global\ 命名事件：Agent/受限会话可编译 -->
   <Import Project="$(ProjectDir)msbuild\QtCriticalSectionLocal.targets" Condition="Exists('$(ProjectDir)msbuild\QtCriticalSectionLocal.targets')" />
+  <!-- Designer 手改 .ui 后：缺绑定名或含 colspan 时在编译前失败并给出明确提示 -->
+  <Import Project="$(ProjectDir)msbuild\UiContract.targets" Condition="Exists('$(ProjectDir)msbuild\UiContract.targets')" />
   <ImportGroup Label="ExtensionTargets" />
 </Project>

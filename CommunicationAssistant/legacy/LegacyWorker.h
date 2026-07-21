@@ -37,6 +37,7 @@ signals:
     void valuesReceived(const QVector<double>& values, int type);
     void controlEvent(int ctrlCmd, int viewId, int msg);
     void parameterEvent(int ctrlCmd, int viewId, int msg, const QVariantMap& extra);
+    void unparsedRx(const QByteArray& raw);
     void backendError(const QString& code, const QString& message);
     void disconnected();
     void shutdownFinished();

@@ -69,8 +69,11 @@ inline bool open(QSerialPort* port, int comPort, int baudIndex, int dataBits, in
     port->close();
     port->setPortName(QStringLiteral("COM%1").arg(comPort + 1));
     port->setBaudRate(baudRate(baudIndex));
+    // dataBits：0=5 1=6 2=7 3=8（与 UIDef / CommHandler 一致）
     port->setDataBits(dataBits == 0 ? QSerialPort::Data5
-                                   : dataBits == 1 ? QSerialPort::Data6 : QSerialPort::Data8);
+                                   : dataBits == 1 ? QSerialPort::Data6
+                                                   : dataBits == 2 ? QSerialPort::Data7
+                                                                   : QSerialPort::Data8);
     port->setParity(parity == 1 ? QSerialPort::EvenParity
                                : parity == 2 ? QSerialPort::OddParity
                                              : parity == 3 ? QSerialPort::SpaceParity

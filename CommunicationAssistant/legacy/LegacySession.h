@@ -48,6 +48,7 @@ private slots:
     void onValuesReceived(const QVector<double>& values, int type);
     void onControlEvent(int ctrlCmd, int viewId, int msg);
     void onParameterEvent(int ctrlCmd, int viewId, int msg, const QVariantMap& extra);
+    void onUnparsedRx(const QByteArray& raw);
     void onBackendError(const QString& code, const QString& message);
     void onBackendDisconnected();
     void onWatchdogTimeout(const QUuid& opId);
@@ -58,6 +59,9 @@ private:
     void emitError(const QString& code, const QString& message, const QUuid& requestId = QUuid());
     void emitTxRecord(const SendRequest& request, RecordStatus status, const QString& code = QString(),
                       const QString& message = QString());
+    // 能力表拒绝的 RX 回调：写短边界记录，禁止静默丢弃
+    void emitRxCapDrop(const QString& reasonCode, int droppedCount);
+    QString protocolObjectLabel() const;
     void tearDown(bool fromFault);
     Result validateSendAgainstCapability(const SendRequest& request, QVector<double>* outValues,
                                          QString* outText, bool* isText) const;
@@ -78,6 +82,10 @@ private:
     QUuid pendingOpenOp_;
     QUuid pendingSendOp_;
     SendRequest pendingSendRequest_;
+
+    // 未解析 RX 限速：窗口内抑制，窗口外补发丢弃计数
+    qint64 lastUnparsedEmitMs_ = 0;
+    int suppressedUnparsedCount_ = 0;
 };
 
 } // namespace ca
