@@ -93,14 +93,16 @@ private:
     void updateSendPlaceholders();
     // 十六进制发送勾选优先：禁用以太网 Legacy 模式下拉，避免双源冲突
     void updateSendFormatMutex();
+    // 原生通道：勾选/取消「十六进制发送」时，单条编辑框文本⇄HEX 互转（仅 UI，不改传输模块）
+    void syncNativeSendEditForHexMode(bool hexOn);
     // 已连接时修改工作模式/连接参数：关闭后按新配置自动重开
     void requestApplyConnectedConfig(const QString& reason);
     // 按当前 UI 配置打开会话（供首次打开与热重连共用）
     void openWithCurrentUiConfig();
     bool isLegacyMode() const;
-    // 接收显示是否为 HEX（否则文本）
+    // 仅接收展示：勾选则 RX 字节以 HEX 显示，否则原样文本（不影响发送）
     bool preferHexDisplay() const;
-    // 十六进制发送勾选（Native 解析 HEX；Legacy 勾选则边界拒绝并写日志）
+    // 仅发送：勾选则按 HEX 解析发出，且 TX 记录按 HEX 展示（不影响接收）
     bool preferHexSend() const;
     // 当前 Legacy 协议显示名（如「串口 0 三思」）
     QString currentLegacyProtocolLabel() const;

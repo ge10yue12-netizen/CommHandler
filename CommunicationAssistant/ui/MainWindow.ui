@@ -862,11 +862,14 @@ QPushButton:pressed {
         </item>
         <item>
          <widget class="QCheckBox" name="hexDisplayCheck">
+          <property name="toolTip">
+           <string>仅影响接收数据在数据窗的展示；不勾选为原样文本，勾选为十六进制。与发送无关。</string>
+          </property>
           <property name="text">
            <string>十六进制显示</string>
           </property>
           <property name="checked">
-           <bool>true</bool>
+           <bool>false</bool>
           </property>
          </widget>
         </item>
@@ -889,6 +892,9 @@ QPushButton:pressed {
         </item>
         <item>
          <widget class="QCheckBox" name="hexSendCheck">
+          <property name="toolTip">
+           <string>仅影响发送（原生）：勾选后按 HEX 发出。若编辑框是明文会自动转为 HEX；已是合法 HEX 则不改写。取消勾选可还原文本。与接收显示无关。</string>
+          </property>
           <property name="text">
            <string>十六进制发送</string>
           </property>

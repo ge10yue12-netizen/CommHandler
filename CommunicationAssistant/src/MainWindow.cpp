@@ -644,7 +644,10 @@ void MainWindow::buildUi()
                 updateSendFormatMutex();
                 updateSendPlaceholders();
             });
-    connect(hexSendCheck_, &QCheckBox::toggled, this, [this](bool) {
+    connect(hexSendCheck_, &QCheckBox::toggled, this, [this](bool on) {
+        // 仅原生：明文不知 HEX 时自动嵌入文本⇄HEX，不改动 Session/Transport
+        if (!isLegacyMode())
+            syncNativeSendEditForHexMode(on);
         updateSendFormatMutex();
         updateSendPlaceholders();
     });
@@ -786,8 +789,8 @@ void MainWindow::updateSendPlaceholders()
     if (!isLegacyMode()) {
         sendEdit_->setPlaceholderText(
             preferHexSend()
-                ? QStringLiteral("原生通道 · 十六进制字节，示例：3D 0D；列表格式为「自动」时与侧栏勾选一致")
-                : QStringLiteral("原生通道 · UTF-8 文本原样发送；列表格式为「自动」时与侧栏勾选一致"));
+                ? QStringLiteral("原生通道 · 十六进制发送：可直接写 3D 0D；勾选时若是明文会自动转为 HEX")
+                : QStringLiteral("原生通道 · 原样文本发送；勾选「十六进制发送」可将明文自动转为 HEX"));
         return;
     }
     if (preferHexSend()) {
@@ -870,6 +873,36 @@ void MainWindow::updateSendFormatMutex()
         hexSendCheck_->setEnabled(uiAlive);
         hexSendCheck_->setVisible(true);
     }
+}
+
+void MainWindow::syncNativeSendEditForHexMode(bool hexOn)
+{
+    if (!sendEdit_ || isLegacyMode())
+        return;
+    const QString text = sendEdit_->toPlainText();
+    if (text.isEmpty())
+        return;
+
+    if (hexOn) {
+        // 已是合法 HEX：视为用户直接写线帧，不二次编码（避免 "3D 0D"→"33 44…"）
+        QString hexErr;
+        const QByteArray asHex = ca::parseHexPayloadStrict(text, &hexErr);
+        if (!asHex.isEmpty() && hexErr.isEmpty())
+            return;
+        // 明文 → 空格分隔 HEX，发出字节与「取消勾选后原文发送」一致
+        const QByteArray raw = text.toUtf8();
+        sendEdit_->setPlainText(QString::fromLatin1(raw.toHex(' ')).toUpper());
+        appendLog(QStringLiteral("[配置] 已将单条内容转为十六进制（按 UTF-8 编码）；发出字节与原文发送相同"));
+        return;
+    }
+
+    // 取消勾选：若当前是合法 HEX，还原为对应文本，便于继续编辑
+    QString hexErr;
+    const QByteArray bytes = ca::parseHexPayloadStrict(text, &hexErr);
+    if (bytes.isEmpty() || !hexErr.isEmpty())
+        return;
+    sendEdit_->setPlainText(QString::fromUtf8(bytes));
+    appendLog(QStringLiteral("[配置] 已将十六进制还原为文本；可继续原文编辑发送"));
 }
 
 void MainWindow::refreshClientCombo()
@@ -1085,8 +1118,23 @@ ca::SessionConfig MainWindow::buildConfig() const
 QByteArray MainWindow::buildPayload(QString* error) const
 {
     const QString text = sendEdit_->toPlainText();
-    if (preferHexSend())
-        return ca::parseHexPayloadStrict(text, error);
+    if (preferHexSend()) {
+        QString hexErr;
+        const QByteArray asHex = ca::parseHexPayloadStrict(text, &hexErr);
+        if (!asHex.isEmpty() && hexErr.isEmpty())
+            return asHex;
+        // 含非法 HEX 字符：按 UTF-8 明文发出（与取消勾选线帧一致），避免用户不知 HEX 时被拒
+        // 偶数长度/纯 HEX 笔误（如奇数位）仍拒绝，以免误发
+        if (hexErr.contains(QStringLiteral("非法十六进制字符"))) {
+            const QByteArray utf8 = text.toUtf8();
+            if (utf8.isEmpty() && session_.activeTransportKind() != ca::TransportKind::Udp && error)
+                *error = QStringLiteral("发送内容为空");
+            return utf8;
+        }
+        if (error)
+            *error = hexErr.isEmpty() ? QStringLiteral("HEX 解析失败") : hexErr;
+        return QByteArray();
+    }
     const QByteArray utf8 = text.toUtf8();
     if (utf8.isEmpty() && session_.activeTransportKind() != ca::TransportKind::Udp && error)
         *error = QStringLiteral("发送内容为空");
@@ -1236,18 +1284,23 @@ QString MainWindow::formatRecordForDisplay(const ca::CommRecord& record) const
     const bool legacyValue = (record.kind == ca::RecordKind::LegacyValueEvent);
     const bool legacyTx = legacyValue && (record.direction == ca::Direction::Tx);
 
-    // Legacy TX：bytes 是业务入参（CSV/文本），不是 CommHandler 线帧；勿当成串口原始包展示
-    const bool legacyUnparsed = record.attributes.value(QStringLiteral("legacyUnparsed")).toBool();
-    if (!record.bytes.isEmpty() && !legacyTx) {
-        // 未解析收包：调试优先展示十六进制（勾选关闭时仍给文本预览）
-        if (preferHexDisplay() || legacyUnparsed)
+    // 收发设置严格分离：
+    // - 「十六进制显示」只影响接收方向字节的展示
+    // - 「十六进制发送」只影响发送方向字节的展示（与发送解析同源）
+    // - 均未勾选 → 原样 UTF-8 文本；不因未解析收包强制 HEX
+    if (legacyTx && !record.bytes.isEmpty()) {
+        // Legacy TX：bytes 为业务入参，非 DLL 线帧；展示不受「十六进制显示」影响
+        body += QStringLiteral(" | 入参 ") + QString::fromUtf8(record.bytes);
+        body += QStringLiteral(" | 线帧由动态库内部编码（接口不回传已发送原始字节；二进制协议请以十六进制核对对端）");
+    } else if (!record.bytes.isEmpty()) {
+        const bool asHex =
+            (record.direction == ca::Direction::Rx)   ? preferHexDisplay()
+            : (record.direction == ca::Direction::Tx) ? preferHexSend()
+                                                      : false;
+        if (asHex)
             body += QStringLiteral(" | 线帧十六进制 ") + QString::fromLatin1(record.bytes.toHex(' '));
         else
             body += QStringLiteral(" | 线帧文本 ") + QString::fromUtf8(record.bytes);
-    }
-    if (legacyTx && !record.bytes.isEmpty()) {
-        body += QStringLiteral(" | 入参 ") + QString::fromUtf8(record.bytes);
-        body += QStringLiteral(" | 线帧由动态库内部编码（接口不回传已发送原始字节；二进制协议请以十六进制核对对端）");
     }
     if (legacyValue) {
         const QVariantList vals = record.attributes.value(QStringLiteral("values")).toList();
@@ -1435,7 +1488,10 @@ void MainWindow::onSendClicked()
     const QByteArray payload = buildPayload(&err);
     const bool allowEmptyUdp = (session_.activeTransportKind() == ca::TransportKind::Udp);
     if (payload.isEmpty() && (!allowEmptyUdp || !err.isEmpty())) {
-        appendLog(QStringLiteral("[边界] 发送拒绝：%1").arg(err.isEmpty() ? QStringLiteral("发送内容为空") : err));
+        QString tip = err.isEmpty() ? QStringLiteral("发送内容为空") : err;
+        if (preferHexSend() && tip.contains(QStringLiteral("十六进制")))
+            tip += QStringLiteral("。提示：可取消「十六进制发送」按原文发出，或先勾选一次让明文自动转为 HEX");
+        appendLog(QStringLiteral("[边界] 发送拒绝：%1").arg(tip));
         return;
     }
     ca::SendRequest req;
@@ -1506,10 +1562,19 @@ void MainWindow::onSchedStartClicked()
             formats.push_back(format);
         } else {
             QByteArray bytes;
-            if (preferHexSend() || format == FormatHex) {
-                QString e;
+            QString e;
+            if (format == FormatHex) {
                 bytes = ca::parseHexPayloadStrict(payload, &e);
                 if (!e.isEmpty()) {
+                    appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行十六进制 — %2").arg(r + 1).arg(e));
+                    return;
+                }
+            } else if (preferHexSend()) {
+                bytes = ca::parseHexPayloadStrict(payload, &e);
+                if (bytes.isEmpty() && e.contains(QStringLiteral("非法十六进制字符"))) {
+                    e.clear();
+                    bytes = payload.toUtf8();
+                } else if (!e.isEmpty()) {
                     appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行十六进制 — %2").arg(r + 1).arg(e));
                     return;
                 }
@@ -1957,10 +2022,18 @@ void MainWindow::onSendListSendSelected()
 
         QByteArray bytes;
         QString err;
-        if (preferHexSend() || format == FormatHex)
+        if (format == FormatHex) {
             bytes = ca::parseHexPayloadStrict(payload, &err);
-        else
+        } else if (preferHexSend()) {
+            bytes = ca::parseHexPayloadStrict(payload, &err);
+            // 与单条一致：侧栏勾选 HEX 时，非法字符按 UTF-8 明文发出
+            if (bytes.isEmpty() && err.contains(QStringLiteral("非法十六进制字符"))) {
+                err.clear();
+                bytes = payload.toUtf8();
+            }
+        } else {
             bytes = payload.toUtf8();
+        }
         if (!err.isEmpty() || bytes.isEmpty()) {
             appendLog(QStringLiteral("[边界] 发送拒绝：第 %1 行 — %2")
                           .arg(r + 1)
