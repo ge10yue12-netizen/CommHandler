@@ -253,6 +253,8 @@ Result CommHandlerBackend::configure(const LegacyConfig& config)
             h->setParameter(QStringLiteral("iDestPort"), static_cast<int>(config.remotePort));
             h->setParameter(QStringLiteral("iProtoType"), config.protocolIndex);
             h->setParameter(QStringLiteral("bInquireSendFlag"), true);
+            // 助手联调观测：PROTO_ACK / 未解析上报；正式软件不设此键则保持默认关闭
+            h->setParameter(QStringLiteral("bAssistObserve"), true);
 
             // 万测：可配置 START/STOP/EXIT 字面量（与 CommLab NetworkProtocol 一致）
             if (config.protocolIndex == 1) {
@@ -339,6 +341,10 @@ Result CommHandlerBackend::sendValues(const QVector<double>& values)
                                 QStringLiteral("联恒网口至少需要 2 个数值（力、温），当前 %1 个").arg(values.size()));
         }
     } else {
+        if (proto == 0 && values.isEmpty()) {
+            return Result::fail(QStringLiteral("invalid_value_count"),
+                                QStringLiteral("串口三思数值发送至少需要 1 个数值"));
+        }
         if (proto == 1 && values.isEmpty()) {
             return Result::fail(QStringLiteral("invalid_value_count"),
                                 QStringLiteral("科新数值发送至少需要 1 个数值"));
@@ -353,7 +359,7 @@ Result CommHandlerBackend::sendValues(const QVector<double>& values)
         }
         if (proto == 2) {
             return Result::fail(QStringLiteral("capability_denied"),
-                                QStringLiteral("时代新材：动态库无数值发送编码分支"));
+                                QStringLiteral("不能发：时代新材动态库无数值发送编码分支"));
         }
     }
 
@@ -416,6 +422,19 @@ void CommHandlerBackend::onEmitNewData(void* data, int size, int type)
 
 void CommHandlerBackend::onEmitEventMsg(int ctrlCmd, int viewId, int msg)
 {
+#if defined(CA_LINK_COMMHANDLER) && CA_LINK_COMMHANDLER
+    // 对齐正式软件：宿主收到启停后维护 bOnlineCollect（PT1 等协议 DLL 不擅自置位）
+    if (handler_ && config_.commType == 0) {
+        auto* h = static_cast<CommHandler*>(handler_);
+        try {
+            if (msg == W_CUSTOM_COMM_STARTCALC)
+                h->setParameter(QStringLiteral("bOnlineCollect"), true);
+            else if (msg == W_CUSTOM_COMM_STOPCALC)
+                h->setParameter(QStringLiteral("bOnlineCollect"), false);
+        } catch (...) {
+        }
+    }
+#endif
     emit controlEvent(ctrlCmd, viewId, msg);
 }
 

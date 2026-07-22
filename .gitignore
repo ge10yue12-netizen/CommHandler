@@ -44,6 +44,9 @@ smoke_result.txt
 *.tmp
 *~
 
+# QtExeTool 便携打包输出（本地生成，勿提交）
+QtExePack/
+
 # 系统
 Thumbs.db
 Desktop.ini

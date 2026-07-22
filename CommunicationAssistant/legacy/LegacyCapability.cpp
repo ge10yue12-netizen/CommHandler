@@ -86,24 +86,29 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
             put(&p, LegacyCapability::ReceiveValues, true);
             put(&p, LegacyCapability::ReceiveControlEvents, false, QStringLiteral("三思控制事件未经验证，按不支持处理"));
             put(&p, LegacyCapability::ReceiveParameterEvents, false);
-            // 对齐 SocketComm::SendData：无 case 3，数值发送不会写出线帧
-            put(&p, LegacyCapability::SendEncodedValues, false,
-                QStringLiteral("动态库 SendData(vector) 未实现网口三思编码分支"));
-            put(&p, LegacyCapability::SendTransparentText, false);
+            // 对齐 SocketComm::SendData：无 case 3，数值发送不会写出线帧（库逻辑不动，助手边界拒绝）
+            put(&p, LegacyCapability::SendEncodedValues, false, QString(),
+                QStringLiteral("不能发：动态库网口三思无 SendData(vector) 编码分支，助手不会写出线帧"));
+            put(&p, LegacyCapability::SendTransparentText, false, QString(),
+                QStringLiteral("不能发：网口三思无透明文本写出路径"));
             break;
         case 4:
             put(&p, LegacyCapability::ReceiveValues, false);
             put(&p, LegacyCapability::ReceiveControlEvents, true);
             put(&p, LegacyCapability::ReceiveParameterEvents, true);
-            put(&p, LegacyCapability::SendEncodedValues, false);
-            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("触发存图透明文本未经验证，按不支持处理"));
+            put(&p, LegacyCapability::SendEncodedValues, false, QString(),
+                QStringLiteral("不能发：触发存图协议无数值发送分支（仅控制/参数事件）"));
+            put(&p, LegacyCapability::SendTransparentText, false, QString(),
+                QStringLiteral("不能发：触发存图透明文本未经验证"));
             break;
         case 5:
             put(&p, LegacyCapability::ReceiveValues, true);
             put(&p, LegacyCapability::ReceiveControlEvents, false);
             put(&p, LegacyCapability::ReceiveParameterEvents, false);
-            put(&p, LegacyCapability::SendEncodedValues, false);
-            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("福建威盛透明文本未经验证，按不支持处理"));
+            put(&p, LegacyCapability::SendEncodedValues, false, QString(),
+                QStringLiteral("不能发：福建威盛无数值发送分支（仅接收解析）"));
+            put(&p, LegacyCapability::SendTransparentText, false, QString(),
+                QStringLiteral("不能发：福建威盛透明文本未经验证"));
             break;
         case 6:
             put(&p, LegacyCapability::ReceiveValues, false);
@@ -163,14 +168,16 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
         put(&p, LegacyCapability::SendTransparentText, false);
         break;
     case 2:
-        // 时代新材：value,num,TYPE,flag；库只取 parts[0]
+        // 时代新材：value,num,TYPE,flag；库只取 parts[0]；SendData(vector) case 2 为空
         put(&p, LegacyCapability::ReceiveValues, true, QString(),
             QStringLiteral("收 1 路（CSV 第 1 段）；第 2 段为设备序号非测量通道"));
         put(&p, LegacyCapability::ReceiveControlEvents, false,
             QStringLiteral("时代新材库无独立控制事件分支"));
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
-        put(&p, LegacyCapability::SendEncodedValues, false);
-        put(&p, LegacyCapability::SendTransparentText, false);
+        put(&p, LegacyCapability::SendEncodedValues, false, QString(),
+            QStringLiteral("不能发：动态库串口时代新材无数值发送编码分支"));
+        put(&p, LegacyCapability::SendTransparentText, false, QString(),
+            QStringLiteral("不能发：SendData(QString) 为空实现"));
         break;
     case 3:
         put(&p, LegacyCapability::ReceiveValues, false);

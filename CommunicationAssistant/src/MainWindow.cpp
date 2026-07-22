@@ -6,16 +6,22 @@
 #include <QRegularExpression>
 
 #include <QAbstractItemView>
+#include <QAction>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDir>
 #include <QFile>
 #include <QFileDialog>
+#include <QDoubleSpinBox>
 #include <QFormLayout>
+#include <QGridLayout>
 #include <QHeaderView>
 #include <QHBoxLayout>
+#include <QLabel>
+#include <QMenu>
 #include <QSerialPortInfo>
 #include <QSignalBlocker>
+#include <QSizePolicy>
 #include <QTableWidgetItem>
 #include <QTextStream>
 #include <QTimer>
@@ -51,9 +57,10 @@ void applySideFormAlign(QFormLayout* form, int labelMinWidth = 56)
 QString appStyleSheet()
 {
     // 侧栏密度对齐参考：小字号、矮控件、小行距（SidePanel 作用域优先）
+    // 下拉三角：显式指定 ::down-arrow，避免自定义 drop-down 后系统箭头被隐藏
     return QStringLiteral(
         "QMainWindow { background: #F3F6F9; font-family: 'Microsoft YaHei UI', 'Segoe UI', sans-serif; font-size: 12px; }"
-        "QScrollArea#SideScroll { background: #EEF2F6; border: none; }"
+        "QScrollArea#SideScroll { background: #EEF2F6; border: none; border-radius: 8px; }"
         "QWidget#SidePanel {"
         "  background: #EEF2F6;"
         "  border-right: 1px solid #D8DEE6;"
@@ -66,21 +73,29 @@ QString appStyleSheet()
         "}"
         "QLabel#SideSection, QLabel#SideSectionFirst {"
         "  font-size: 12px; font-weight: 600; color: #374151;"
-        "  padding: 6px 0 0 0; margin: 0;"
+        "  padding: 8px 0 2px 0; margin: 2px 0 0 0;"
         "  border-top: 1px solid #D8DEE6;"
         "}"
-        "QLabel#SideSectionFirst { border-top: none; padding-top: 0; }"
+        "QLabel#SideSectionFirst { border-top: none; padding-top: 0; margin-top: 0; }"
         "QLabel#FieldLabel { font-size: 12px; font-weight: 400; color: #4B5563; padding: 0; }"
         "QWidget#SidePanel QComboBox,"
         "QWidget#SidePanel QLineEdit,"
-        "QWidget#SidePanel QSpinBox {"
+        "QWidget#SidePanel QSpinBox,"
+        "QWidget#SidePanel QDoubleSpinBox {"
         "  background: #FFFFFF; border: 1px solid #D1D9E3; border-radius: 3px;"
-        "  padding: 1px 4px; min-height: 20px; max-height: 22px; font-size: 12px; color: #111827;"
+        "  padding: 1px 6px 1px 4px; min-height: 20px; max-height: 22px; font-size: 12px; color: #111827;"
         "}"
         "QWidget#SidePanel QComboBox:focus,"
         "QWidget#SidePanel QLineEdit:focus,"
-        "QWidget#SidePanel QSpinBox:focus { border: 1px solid #3B82F6; }"
-        "QWidget#SidePanel QComboBox::drop-down { border: none; width: 16px; }"
+        "QWidget#SidePanel QSpinBox:focus,"
+        "QWidget#SidePanel QDoubleSpinBox:focus { border: 1px solid #3B82F6; }"
+        "QWidget#SidePanel QComboBox::drop-down {"
+        "  subcontrol-origin: padding; subcontrol-position: center right;"
+        "  width: 16px; border: none; border-left: 1px solid #E5E7EB;"
+        "}"
+        "QWidget#SidePanel QComboBox::down-arrow {"
+        "  image: url(:/ca/icons/combo_down.png); width: 10px; height: 10px;"
+        "}"
         "QWidget#SidePanel QCheckBox {"
         "  color: #374151; font-size: 12px; spacing: 4px; padding: 0; min-height: 18px; max-height: 20px;"
         "}"
@@ -104,20 +119,61 @@ QString appStyleSheet()
         "  padding: 2px 6px; font-size: 11px; min-height: 18px; max-height: 20px;"
         "}"
         "QWidget#SidePanel QLabel#CapTip {"
-        "  color: #4B5563; font-size: 11px; padding: 4px 6px;"
+        "  color: #4B5563; font-size: 11px; padding: 6px 8px;"
         "  background: #E8EDF3; border: 1px solid #D8DEE6; border-radius: 4px;"
         "}"
-        "QComboBox, QLineEdit, QSpinBox, QPlainTextEdit {"
+        "QComboBox, QLineEdit, QSpinBox, QDoubleSpinBox, QPlainTextEdit {"
         "  background: #FFFFFF; border: 1px solid #D1D9E3; border-radius: 6px;"
-        "  padding: 4px 8px; min-height: 18px; color: #111827;"
+        "  padding: 4px 8px; min-height: 22px; color: #111827;"
         "}"
-        "QComboBox:focus, QLineEdit:focus, QSpinBox:focus, QPlainTextEdit:focus { border: 1px solid #3B82F6; }"
-        "QComboBox::drop-down { border: none; width: 22px; }"
+        "QComboBox { padding-right: 22px; }"
+        "QComboBox:focus, QLineEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus, QPlainTextEdit:focus {"
+        "  border: 1px solid #3B82F6;"
+        "}"
+        "QAbstractSpinBox::up-button, QAbstractSpinBox::down-button {"
+        "  width: 0px; height: 0px; border: none; margin: 0; padding: 0;"
+        "}"
+        "QAbstractSpinBox { padding-right: 8px; }"
+        "QWidget#tabWave QAbstractSpinBox {"
+        "  min-height: 26px; max-height: 26px;"
+        "}"
+        "QWidget#tabWave QLabel#FieldLabel { font-size: 12px; font-weight: 400; color: #4B5563; }"
+        "QWidget#tabWave QLabel#WaveHint,"
+        "QLabel#CapTip {"
+        "  color: #4B5563; font-size: 11px; padding: 6px 8px;"
+        "  background: #E8EDF3; border: 1px solid #D8DEE6; border-radius: 4px;"
+        "}"
+        // 发送工作台按钮统一：「发送 / 启动波形 / 暂停…」共用 SecondaryButton
+        "QTabWidget#SendTabs QPushButton#SecondaryButton {"
+        "  background: #FFFFFF; color: #374151; border: 1px solid #D1D9E3; border-radius: 4px;"
+        "  padding: 4px 12px; min-height: 24px; max-height: 28px; min-width: 56px; font-size: 12px;"
+        "}"
+        "QTabWidget#SendTabs QPushButton#SecondaryButton:hover:!disabled {"
+        "  border-color: #9CA3AF; color: #111827; background: #FFFFFF;"
+        "}"
+        "QTabWidget#SendTabs QPushButton#SecondaryButton:disabled {"
+        "  color: #9CA3AF; background: #F3F4F6; border: 1px solid #D1D9E3;"
+        "}"
+        "QTabWidget#SendTabs QPushButton#SecondaryButton:pressed:!disabled {"
+        "  background: #F3F4F6; border-color: #9CA3AF;"
+        "}"
+        "QComboBox::drop-down {"
+        "  subcontrol-origin: padding; subcontrol-position: center right;"
+        "  width: 20px; border: none; border-left: 1px solid #E5E7EB;"
+        "}"
+        "QComboBox::down-arrow {"
+        "  image: url(:/ca/icons/combo_down.png); width: 10px; height: 10px;"
+        "}"
         "QPushButton#SendButton {"
         "  background: #3B82F6; color: white; border: none; border-radius: 10px;"
         "  min-width: 48px; min-height: 48px; font-size: 16px; font-weight: 700;"
         "}"
         "QPushButton#SendButton:disabled { background: #93C5FD; }"
+        "QPushButton#PaneClearButton {"
+        "  background: #FFFFFF; color: #374151; border: 1px solid #D1D9E3; border-radius: 4px;"
+        "  padding: 2px 10px; min-height: 22px; font-size: 12px;"
+        "}"
+        "QPushButton#PaneClearButton:hover { border-color: #9CA3AF; color: #111827; }"
         "QPlainTextEdit#LogView, QPlainTextEdit#DataView {"
         "  background: #FFFFFF; border: 1px solid #D8DEE6; border-radius: 10px; padding: 6px;"
         "  font-family: Consolas, 'Microsoft YaHei UI';"
@@ -231,6 +287,62 @@ bool MainWindow::preferHexSend() const
     return hexSendCheck_ && hexSendCheck_->isChecked();
 }
 
+bool MainWindow::preferHexAsciiDisplay() const
+{
+    return hexAsciiCheck_ && hexAsciiCheck_->isChecked();
+}
+
+bool MainWindow::clearAfterSend() const
+{
+    return clearAfterSendCheck_ && clearAfterSendCheck_->isChecked();
+}
+
+int MainWindow::recommendedWaveChannels() const
+{
+    if (!isLegacyMode())
+        return 2;
+    const ca::LegacyCommKind kind =
+        (legacyCommTypeCombo_ && legacyCommTypeCombo_->currentData().toInt() == 1)
+            ? ca::LegacyCommKind::Serial
+            : ca::LegacyCommKind::Network;
+    const int proto = legacyProtocolCombo_ ? legacyProtocolCombo_->currentData().toInt() : 0;
+    if (kind == ca::LegacyCommKind::Network) {
+        if (proto == 2)
+            return 2;
+        if (proto == 7)
+            return 4;
+        if (proto == 8)
+            return 2;
+        return 2;
+    }
+    if (proto == 1)
+        return 1;
+    if (proto == 3)
+        return 5;
+    if (proto == 4 || proto == 5)
+        return 2;
+    return 2;
+}
+
+QString MainWindow::bytesAsPrintableAscii(const QByteArray& bytes)
+{
+    QString out;
+    out.reserve(bytes.size());
+    for (unsigned char c : bytes) {
+        if (c >= 0x20 && c < 0x7f)
+            out.append(QChar(c));
+        else if (c == '\r')
+            out.append(QStringLiteral("\\r"));
+        else if (c == '\n')
+            out.append(QStringLiteral("\\n"));
+        else if (c == '\t')
+            out.append(QStringLiteral("\\t"));
+        else
+            out.append(QLatin1Char('.'));
+    }
+    return out;
+}
+
 QString MainWindow::currentLegacyProtocolLabel() const
 {
     const QString proto =
@@ -303,7 +415,8 @@ void MainWindow::bindUiWidgets()
 
     hexDisplayCheck_ = ui_.hexDisplayCheck;
     captureEnableCheck_ = ui_.captureEnableCheck;
-    btnClear_ = ui_.btnClear;
+    btnClearData_ = ui_.btnClearData;
+    btnClearLog_ = ui_.btnClearLog;
 
     sendTabs_ = ui_.sendTabs;
     hexSendCheck_ = ui_.hexSendCheck;
@@ -314,9 +427,9 @@ void MainWindow::bindUiWidgets()
     sendListTable_ = ui_.sendListTable;
     btnListAdd_ = ui_.btnListAdd;
     btnListRemove_ = ui_.btnListRemove;
+    btnListClearAll_ = ui_.btnListClearAll;
     btnListImport_ = ui_.btnListImport;
     btnListExport_ = ui_.btnListExport;
-    btnListSendSelected_ = ui_.btnListSendSelected;
 
     schedModeCombo_ = ui_.schedModeCombo;
     schedIntervalSpin_ = ui_.schedIntervalSpin;
@@ -338,9 +451,10 @@ void MainWindow::populateDynamicUi()
 {
     // 分区 / 字段标签样式（objectName 供 QSS，避免与 uic 成员名冲突）
     ui_.secConnect->setObjectName(QStringLiteral("SideSectionFirst"));
+    if (ui_.secConfig)
+        ui_.secConfig->setObjectName(QStringLiteral("SideSection"));
     ui_.secReceive->setObjectName(QStringLiteral("SideSection"));
     ui_.secSend->setObjectName(QStringLiteral("SideSection"));
-    ui_.secOther->setObjectName(QStringLiteral("SideSection"));
     for (QLabel* lab : {ui_.secWorkMode, ui_.secConn, ui_.clientSectionLabel}) {
         if (lab)
             lab->setObjectName(QStringLiteral("FieldLabel"));
@@ -357,7 +471,10 @@ void MainWindow::populateDynamicUi()
     ui_.btnOpen->setObjectName(QStringLiteral("PrimaryButton"));
     ui_.statusLabel->setObjectName(QStringLiteral("StatusPill"));
     ui_.btnDisconnectClient->setObjectName(QStringLiteral("SecondaryButton"));
-    ui_.btnClear->setObjectName(QStringLiteral("GhostButton"));
+    if (ui_.btnClearData)
+        ui_.btnClearData->setObjectName(QStringLiteral("PaneClearButton"));
+    if (ui_.btnClearLog)
+        ui_.btnClearLog->setObjectName(QStringLiteral("PaneClearButton"));
     ui_.btnResetCount->setObjectName(QStringLiteral("GhostButton"));
     ui_.dataTitle->setObjectName(QStringLiteral("PaneTitle"));
     ui_.logTitle->setObjectName(QStringLiteral("PaneTitle"));
@@ -377,9 +494,9 @@ void MainWindow::populateDynamicUi()
     ui_.sendSideHint->setObjectName(QStringLiteral("CapTip"));
     ui_.txCountLabel->setObjectName(QStringLiteral("FooterStat"));
     ui_.rxCountLabel->setObjectName(QStringLiteral("FooterStat"));
-    for (QPushButton* btn : {ui_.btnListAdd, ui_.btnListRemove, ui_.btnListImport, ui_.btnListExport,
-                             ui_.btnListSendSelected, ui_.btnSchedStart, ui_.btnSchedPause,
-                             ui_.btnSchedResume, ui_.btnSchedStop}) {
+    for (QPushButton* btn : {ui_.btnListAdd, ui_.btnListRemove, ui_.btnListClearAll, ui_.btnListImport,
+                             ui_.btnListExport, ui_.btnSchedStart, ui_.btnSchedPause, ui_.btnSchedResume,
+                             ui_.btnSchedStop}) {
         if (btn)
             btn->setObjectName(QStringLiteral("SecondaryButton"));
     }
@@ -490,10 +607,11 @@ void MainWindow::populateDynamicUi()
     sendListTable_->horizontalHeader()->setSectionResizeMode(2, QHeaderView::Stretch);
 
     schedModeCombo_->clear();
-    schedModeCombo_->addItem(QStringLiteral("单次（仅首行）"), static_cast<int>(ca::ScheduleMode::Once));
-    schedModeCombo_->addItem(QStringLiteral("列表轮询"), static_cast<int>(ca::ScheduleMode::RoundRobin));
-    schedModeCombo_->addItem(QStringLiteral("周期（无限轮询）"), static_cast<int>(ca::ScheduleMode::Infinite));
-    schedModeCombo_->addItem(QStringLiteral("指定次数（轮询）"), static_cast<int>(ca::ScheduleMode::Counted));
+    schedModeCombo_->addItem(QStringLiteral("单次"), static_cast<int>(ca::ScheduleMode::Once));
+    // 周期循环：合并原「轮询列表」与「周期性发送」（多行轮转，单行无限重复）
+    schedModeCombo_->addItem(QStringLiteral("周期循环"), static_cast<int>(ca::ScheduleMode::RoundRobin));
+    schedModeCombo_->addItem(QStringLiteral("指定次数"), static_cast<int>(ca::ScheduleMode::Counted));
+    updateSchedControlsVisibility();
 
     // 数据显示/日志吃剩余高度；工作台固定高度，切换页签不挤布局
     ui_.panesSplitter->setStretchFactor(0, 3);
@@ -523,11 +641,11 @@ void MainWindow::populateDynamicUi()
         legacyEndpointStack_->setMaximumHeight(168);
         legacyEndpointStack_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
     }
-    // 能力区：独立加高，放在载荷提示下方
+    // 能力说明区：独立加高，放在载荷提示下方
     if (ui_.lblLegacyCap)
         ui_.lblLegacyCap->setObjectName(QStringLiteral("SideSection"));
     if (legacyCapTipLabel_) {
-        legacyCapTipLabel_->setMinimumHeight(108);
+        legacyCapTipLabel_->setMinimumHeight(140);
         legacyCapTipLabel_->setMaximumHeight(QWIDGETSIZE_MAX);
         legacyCapTipLabel_->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::MinimumExpanding);
         legacyCapTipLabel_->setAlignment(Qt::AlignLeft | Qt::AlignTop);
@@ -544,6 +662,12 @@ void MainWindow::populateDynamicUi()
     if (btnDisconnectClient_)
         btnDisconnectClient_->setVisible(false);
 
+    // 发送列表：右键菜单；勾选为业务选中语义
+    if (sendListTable_) {
+        sendListTable_->setContextMenuPolicy(Qt::CustomContextMenu);
+        sendListTable_->setSelectionMode(QAbstractItemView::NoSelection);
+    }
+
     // 能力区 objectName 变更后重刷侧栏样式
     applyStyle();
 }
@@ -553,6 +677,8 @@ void MainWindow::buildUi()
     ui_.setupUi(this);
     bindUiWidgets();
     populateDynamicUi();
+    buildNativeAssistOptions();
+    buildWaveformTab();
 
     connect(workModeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onWorkModeChanged);
     connect(transportCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, &MainWindow::onTransportChanged);
@@ -623,19 +749,35 @@ void MainWindow::buildUi()
         connect(legacyTransferCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
                 applyEndpoint(QStringLiteral("兼容传输方式")));
     connect(btnSend_, &QPushButton::clicked, this, &MainWindow::onSendClicked);
-    connect(btnClear_, &QPushButton::clicked, this, &MainWindow::onClearLogClicked);
+    if (btnClearData_)
+        connect(btnClearData_, &QPushButton::clicked, this, &MainWindow::onClearDataClicked);
+    if (btnClearLog_)
+        connect(btnClearLog_, &QPushButton::clicked, this, &MainWindow::onClearLogClicked);
     connect(btnDisconnectClient_, &QPushButton::clicked, this, &MainWindow::onDisconnectClientClicked);
     connect(btnSchedStart_, &QPushButton::clicked, this, &MainWindow::onSchedStartClicked);
     connect(btnSchedPause_, &QPushButton::clicked, this, &MainWindow::onSchedPauseClicked);
     connect(btnSchedResume_, &QPushButton::clicked, this, &MainWindow::onSchedResumeClicked);
     connect(btnSchedStop_, &QPushButton::clicked, this, &MainWindow::onSchedStopClicked);
+    if (btnWaveStart_)
+        connect(btnWaveStart_, &QPushButton::clicked, this, &MainWindow::onWaveSchedStartClicked);
+    if (btnWavePause_)
+        connect(btnWavePause_, &QPushButton::clicked, this, &MainWindow::onSchedPauseClicked);
+    if (btnWaveResume_)
+        connect(btnWaveResume_, &QPushButton::clicked, this, &MainWindow::onSchedResumeClicked);
+    if (btnWaveStop_)
+        connect(btnWaveStop_, &QPushButton::clicked, this, &MainWindow::onSchedStopClicked);
     connect(btnListAdd_, &QPushButton::clicked, this, &MainWindow::onSendListAddRow);
     connect(btnListRemove_, &QPushButton::clicked, this, &MainWindow::onSendListRemoveRows);
+    if (btnListClearAll_)
+        connect(btnListClearAll_, &QPushButton::clicked, this, &MainWindow::onSendListClearAll);
     connect(btnListImport_, &QPushButton::clicked, this, &MainWindow::onSendListImport);
     connect(btnListExport_, &QPushButton::clicked, this, &MainWindow::onSendListExport);
-    connect(btnListSendSelected_, &QPushButton::clicked, this, &MainWindow::onSendListSendSelected);
+    if (sendListTable_)
+        connect(sendListTable_, &QTableWidget::customContextMenuRequested, this,
+                &MainWindow::onSendListContextMenu);
     connect(schedModeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this, [this](int) {
         updateSendPlaceholders();
+        updateSchedControlsVisibility();
         syncUi();
     });
     connect(legacySendModeCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
@@ -664,8 +806,9 @@ void MainWindow::buildUi()
         lastRxMs_ = 0;
         updateCounters();
     });
-    addSendListRow(true, QStringLiteral("示例-力温"), QStringLiteral("12.3,45.6"), 1000, FormatValues);
+    addSendListRow(true, QStringLiteral("示例-力温"), QStringLiteral("12.3,45.6"), FormatValues);
     updateSendPlaceholders();
+    updateSchedControlsVisibility();
 }
 
 void MainWindow::onWorkModeChanged(int)
@@ -687,6 +830,8 @@ void MainWindow::onWorkModeChanged(int)
     }
     refreshLegacyCapabilityTips();
     updateSendPlaceholders();
+    if (waveChannelsSpin_)
+        waveChannelsSpin_->setValue(recommendedWaveChannels());
     syncUi();
     requestApplyConnectedConfig(QStringLiteral("工作模式"));
 }
@@ -717,6 +862,8 @@ void MainWindow::onLegacyCommTypeChanged()
     }
     refreshLegacyCapabilityTips();
     updateSendPlaceholders();
+    if (waveChannelsSpin_)
+        waveChannelsSpin_->setValue(recommendedWaveChannels());
     syncUi();
     requestApplyConnectedConfig(QStringLiteral("网口/串口"));
 }
@@ -725,6 +872,8 @@ void MainWindow::onLegacyProtocolChanged()
 {
     refreshLegacyCapabilityTips();
     updateSendPlaceholders();
+    if (waveChannelsSpin_)
+        waveChannelsSpin_->setValue(recommendedWaveChannels());
     syncUi();
     requestApplyConnectedConfig(QStringLiteral("协议"));
 }
@@ -744,50 +893,109 @@ void MainWindow::refreshLegacyCapabilityTips()
 
     const ca::LegacyCommKind kind =
         (legacyCommTypeCombo_->currentData().toInt() == 1) ? ca::LegacyCommKind::Serial : ca::LegacyCommKind::Network;
-    const ca::LegacyCapabilityProfile profile =
-        ca::legacyCapabilityFor(kind, legacyProtocolCombo_->currentData().toInt());
+    const int proto = legacyProtocolCombo_->currentData().toInt();
+    const ca::LegacyCapabilityProfile profile = ca::legacyCapabilityFor(kind, proto);
+    const QString protoLabel = currentLegacyProtocolLabel();
+
     QStringList lines;
-    lines << QStringLiteral("%1  %2  %3  %4")
-                 .arg(profile.supports(ca::LegacyCapability::ReceiveValues) ? QStringLiteral("收数值：支持")
-                                                                           : QStringLiteral("收数值：不支持"),
-                      profile.supports(ca::LegacyCapability::SendEncodedValues) ? QStringLiteral("发数值：支持")
-                                                                               : QStringLiteral("发数值：不支持"),
-                      profile.supports(ca::LegacyCapability::SendTransparentText) ? QStringLiteral("发文本：支持")
-                                                                                 : QStringLiteral("发文本：不支持"),
-                      profile.supports(ca::LegacyCapability::ReceiveControlEvents) ? QStringLiteral("控制事件：支持")
-                                                                                  : QStringLiteral("控制事件：不支持"));
+    lines << QStringLiteral("【协议】%1").arg(protoLabel);
+    lines << QStringLiteral("【收发能力】");
+    lines << QStringLiteral("· 收数值：%1")
+                 .arg(profile.supports(ca::LegacyCapability::ReceiveValues) ? QStringLiteral("支持")
+                                                                            : QStringLiteral("不支持"));
+    lines << QStringLiteral("· 发数值：%1")
+                 .arg(profile.supports(ca::LegacyCapability::SendEncodedValues) ? QStringLiteral("支持")
+                                                                               : QStringLiteral("不支持"));
+    lines << QStringLiteral("· 发文本：%1")
+                 .arg(profile.supports(ca::LegacyCapability::SendTransparentText) ? QStringLiteral("支持")
+                                                                                 : QStringLiteral("不支持"));
+    lines << QStringLiteral("· 控制事件：%1")
+                 .arg(profile.supports(ca::LegacyCapability::ReceiveControlEvents) ? QStringLiteral("支持")
+                                                                                   : QStringLiteral("不支持"));
+    lines << QStringLiteral("· 参数事件：%1")
+                 .arg(profile.supports(ca::LegacyCapability::ReceiveParameterEvents) ? QStringLiteral("支持")
+                                                                                    : QStringLiteral("不支持"));
+
     const QString lim = profile.entries.value(static_cast<int>(ca::LegacyCapability::SendEncodedValues)).limitation;
-    if (!lim.isEmpty())
-        lines << lim;
+    const QString rxLim = profile.entries.value(static_cast<int>(ca::LegacyCapability::ReceiveValues)).limitation;
+    if (!lim.isEmpty() || !rxLim.isEmpty()) {
+        lines << QStringLiteral("【边界约束】");
+        if (!lim.isEmpty())
+            lines << QStringLiteral("· 发送：%1").arg(lim);
+        if (!rxLim.isEmpty())
+            lines << QStringLiteral("· 接收：%1").arg(rxLim);
+    }
+
     if (!profile.supports(ca::LegacyCapability::SendEncodedValues)
         && !profile.supports(ca::LegacyCapability::SendTransparentText))
-        lines << QStringLiteral("当前协议无可用发送路径；发起发送将被拒绝并记入运行日志");
-    lines << QStringLiteral("不支持原始十六进制发送；线帧级核对请使用原生通道");
-    const int proto = legacyProtocolCombo_->currentData().toInt();
+        lines << QStringLiteral("· 当前协议无可用发送路径；发起发送将被拒绝并记入运行日志");
+
+    lines << QStringLiteral("【日志关注】");
+    lines << QStringLiteral("· [连接]：开闭与就绪状态");
+    lines << QStringLiteral("· [边界]：能力拒绝、未解析 RX、参数不合法");
+    lines << QStringLiteral("· [异常]：发送失败、会话错误");
+    lines << QStringLiteral("· 数据区：测数/控制事件/已提交载荷");
+
+    lines << QStringLiteral("【通用限制】");
+    lines << QStringLiteral("· 兼容动态库不支持原始十六进制发送；线帧级核对请使用原生通道");
+
     const bool binaryWire =
         (kind == ca::LegacyCommKind::Network && (proto == 2 || proto == 8))
         || (kind == ca::LegacyCommKind::Serial && proto == 5);
     if (binaryWire)
-        lines << QStringLiteral("线帧为二进制；对端应以十六进制方式核对，勿以文本乱码判定失败");
+        lines << QStringLiteral("· 线帧为二进制；对端应以十六进制核对，勿以文本乱码判定失败");
+
+    if (kind == ca::LegacyCommKind::Network && proto == 0)
+        lines << QStringLiteral(
+            "· 网口 JSON：对端 {\"tn\":1}/{tn:3} 为控制收；工作台发数值编码为 tn:2。"
+            "自动 ACK 出现在数据区「协议应答」；未识别 JSON 记未解析边界");
+    if (kind == ca::LegacyCommKind::Network && proto == 2)
+        lines << QStringLiteral("· 中机：发送须恰好 2 路数值，库以定长二进制直发");
     if (kind == ca::LegacyCommKind::Network && proto == 3)
-        lines << QStringLiteral("网口三思：动态库未实现数值发送分支，不会向链路写出数据");
-    if (kind == ca::LegacyCommKind::Serial && proto == 0)
-        lines << QStringLiteral("串口三思：定宽 ASCII 数值段，以 0x0D 结束；对端文本模式通常可读");
-    if (kind == ca::LegacyCommKind::Serial && proto == 1)
-        lines << QStringLiteral("科新：发/收均为单路力值；控制字 HEX 7B51…5D7D（{QLI[1/2]}）");
-    if (kind == ca::LegacyCommKind::Serial && proto == 2)
-        lines << QStringLiteral("时代新材：对端发 value,num,TYPE,flag\\r\\n；助手仅显示第 1 段数值");
+        lines << QStringLiteral("· 网口三思：动态库未实现数值发送分支，不会向链路写出数据");
     if (kind == ca::LegacyCommKind::Network && proto == 7)
-        lines << QStringLiteral("纳百川线条：calcStart/calcEnd 文本与等价 HEX 字节均应触发控制事件");
+        lines << QStringLiteral("· 纳百川线条：calcStart/calcEnd 文本与等价 HEX 字节均应触发控制事件");
+    if (kind == ca::LegacyCommKind::Network && proto == 8)
+        lines << QStringLiteral(
+            "· 联恒网口(iProtoType=8)：至少力、温两路；流式拼帧；完整坏帧报未解析，断帧等待不误报");
+    if (kind == ca::LegacyCommKind::Serial && proto == 0)
+        lines << QStringLiteral("· 串口三思：定宽 ASCII 数值段，以 0x0D 结束；对端文本模式通常可读");
+    if (kind == ca::LegacyCommKind::Serial && proto == 1)
+        lines << QStringLiteral(
+            "· 科新：发/收均为单路力值；控制字 HEX 7B51…5D7D（{QLI[1/2]}）对应开始/停止计算事件");
+    if (kind == ca::LegacyCommKind::Serial && proto == 2)
+        lines << QStringLiteral("· 时代新材：对端发 value,num,TYPE,flag\\r\\n；助手仅显示第 1 段数值");
+    if (kind == ca::LegacyCommKind::Serial && proto == 5)
+        lines << QStringLiteral(
+            "· 联恒串口(iProtocolType=5)：至少力、温两路；流式拼帧与 CRC；与正式库索引一致，不占用历史 case 0");
+
     if (profile.supports(ca::LegacyCapability::RequiresStreamingState)
         || profile.supports(ca::LegacyCapability::RequiresPollingPermission))
         lines << QStringLiteral(
-            "联恒等协议：发送前须获动态库发送许可（对端开始/流控）；未许可时发送会被拒绝而非静默成功");
-    // 展示 ReceiveValues / SendEncodedValues 的 limitation 说明
-    const QString rxLim = profile.entries.value(static_cast<int>(ca::LegacyCapability::ReceiveValues)).limitation;
-    if (!rxLim.isEmpty())
-        lines << rxLim;
+            "· 联恒等协议：发送前须获动态库发送许可（对端开始/流控）；未许可时发送会被拒绝而非静默成功");
+
+    lines << QStringLiteral("· 波形发送：仅在「能发数值」的协议可用；不能发的协议见上方能力说明");
+
     legacyCapTipLabel_->setText(lines.join(QChar('\n')));
+}
+
+void MainWindow::updateSchedControlsVisibility()
+{
+    if (!schedModeCombo_)
+        return;
+    const int mode = schedModeCombo_->currentData().toInt();
+    const bool needInterval =
+        (mode == static_cast<int>(ca::ScheduleMode::RoundRobin)
+         || mode == static_cast<int>(ca::ScheduleMode::Counted));
+    const bool needCount = (mode == static_cast<int>(ca::ScheduleMode::Counted));
+    if (schedIntervalSpin_) {
+        schedIntervalSpin_->setVisible(needInterval);
+        schedIntervalSpin_->setEnabled(needInterval);
+    }
+    if (schedCountSpin_) {
+        schedCountSpin_->setVisible(needCount);
+        schedCountSpin_->setEnabled(needCount);
+    }
 }
 
 void MainWindow::updateSendPlaceholders()
@@ -807,15 +1015,15 @@ void MainWindow::updateSendPlaceholders()
         return;
     }
     const int mode = schedModeCombo_ ? schedModeCombo_->currentData().toInt() : 0;
-    const bool list = (mode == static_cast<int>(ca::ScheduleMode::RoundRobin));
-    if (list) {
+    const bool loop = (mode == static_cast<int>(ca::ScheduleMode::RoundRobin));
+    if (loop) {
         sendEdit_->setPlaceholderText(
-            QStringLiteral("兼容动态库 · 列表轮询：每行一组入参。数值示例：12.3,45.6\n"
+            QStringLiteral("兼容动态库 · 周期循环：每行一组入参。数值示例：12.3,45.6\n"
                            "支持透明文本的协议可发送普通字符串。原始十六进制请改用原生通道"));
     } else {
         sendEdit_->setPlaceholderText(
             QStringLiteral("兼容动态库 · 数值 CSV 示例：12.3,45.6；或透明文本（视协议能力）\n"
-                           "多组发送请使用「列表轮询」。原始十六进制请改用原生通道"));
+                           "多组发送请使用「周期循环」。原始十六进制请改用原生通道"));
     }
 }
 
@@ -988,18 +1196,33 @@ void MainWindow::syncUi()
         btnSchedResume_->setEnabled(uiAlive && schedActive && schedPaused);
     if (btnSchedStop_)
         btnSchedStop_->setEnabled(uiAlive && schedActive);
+    if (btnWaveStart_)
+        btnWaveStart_->setEnabled(uiAlive && !schedActive);
+    if (btnWavePause_)
+        btnWavePause_->setEnabled(uiAlive && schedActive && !schedPaused);
+    if (btnWaveResume_)
+        btnWaveResume_->setEnabled(uiAlive && schedActive && schedPaused);
+    if (btnWaveStop_)
+        btnWaveStop_->setEnabled(uiAlive && schedActive);
+    if (waveNativeHexCheck_)
+        waveNativeHexCheck_->setVisible(!legacy);
+    if (hexAsciiCheck_)
+        hexAsciiCheck_->setEnabled(uiAlive);
+    if (clearAfterSendCheck_)
+        clearAfterSendCheck_->setEnabled(uiAlive);
     if (btnListAdd_)
         btnListAdd_->setEnabled(uiAlive);
     if (btnListRemove_)
         btnListRemove_->setEnabled(uiAlive);
+    if (btnListClearAll_)
+        btnListClearAll_->setEnabled(uiAlive);
     if (btnListImport_)
         btnListImport_->setEnabled(uiAlive);
     if (btnListExport_)
         btnListExport_->setEnabled(uiAlive);
-    if (btnListSendSelected_)
-        btnListSendSelected_->setEnabled(uiAlive);
     if (sendListTable_)
         sendListTable_->setEnabled(uiAlive);
+    updateSchedControlsVisibility();
 
     // 客户端/广播区暂不展示（保留控件与槽，后续可恢复）
     if (clientSectionLabel_)
@@ -1313,10 +1536,15 @@ QString MainWindow::formatRecordForDisplay(const ca::CommRecord& record) const
             (record.direction == ca::Direction::Rx)   ? preferHexDisplay()
             : (record.direction == ca::Direction::Tx) ? preferHexSend()
                                                       : false;
-        if (asHex)
+        if (asHex) {
             body += QStringLiteral(" | 线帧十六进制 ") + QString::fromLatin1(record.bytes.toHex(' '));
-        else
+            if (record.direction == ca::Direction::Rx && preferHexAsciiDisplay())
+                body += QStringLiteral(" | ASCII ") + bytesAsPrintableAscii(record.bytes);
+        } else {
             body += QStringLiteral(" | 线帧文本 ") + QString::fromUtf8(record.bytes);
+            if (record.direction == ca::Direction::Rx && preferHexAsciiDisplay())
+                body += QStringLiteral(" | HEX ") + QString::fromLatin1(record.bytes.toHex(' '));
+        }
     }
     if (legacyValue) {
         const QVariantList vals = record.attributes.value(QStringLiteral("values")).toList();
@@ -1349,8 +1577,23 @@ QString MainWindow::formatRecordForDisplay(const ca::CommRecord& record) const
                        .arg(msg, 0, 16);
         if (record.kind == ca::RecordKind::LegacyParameterEvent) {
             const QVariantMap extra = record.attributes.value(QStringLiteral("extra")).toMap();
-            if (!extra.isEmpty())
+            if (extra.contains(QStringLiteral("wireTx"))) {
+                const int ackCode = extra.value(QStringLiteral("ackCode")).toInt();
+                const QString ackMsg = extra.value(QStringLiteral("ackMessage")).toString();
+                const QString wire = extra.value(QStringLiteral("wireTx")).toString();
+                body += QStringLiteral(" | 自动应答 code=%1").arg(ackCode);
+                if (!ackMsg.isEmpty())
+                    body += QStringLiteral(" %1").arg(ackMsg);
+                if (!wire.isEmpty()) {
+                    if (preferHexDisplay() && record.direction == ca::Direction::Tx)
+                        body += QStringLiteral(" | 线帧十六进制 ")
+                                + QString::fromLatin1(wire.toUtf8().toHex(' '));
+                    else
+                        body += QStringLiteral(" | %1").arg(wire);
+                }
+            } else if (!extra.isEmpty()) {
                 body += QStringLiteral(" | 附加参数键数=%1").arg(extra.size());
+            }
         }
     }
     return QStringLiteral("[%1][%2][%3] %4")
@@ -1507,8 +1750,11 @@ void MainWindow::onSendClicked()
         const ca::Result r = legacySession_.send(req);
         if (!r.ok)
             appendLog(QStringLiteral("[异常] 发送失败：%1").arg(r.message));
-        else
+        else {
             appendData(QStringLiteral("[TX][Pending] %1").arg(QString::fromUtf8(req.payload)));
+            if (clearAfterSend() && sendEdit_)
+                sendEdit_->clear();
+        }
         return;
     }
 
@@ -1531,16 +1777,18 @@ void MainWindow::onSendClicked()
     const ca::Result r = session_.send(req);
     if (!r.ok)
         appendLog(QStringLiteral("[异常] 发送失败：%1").arg(r.message));
+    else if (clearAfterSend() && sendEdit_)
+        sendEdit_->clear();
 }
 
 void MainWindow::onSchedStartClicked()
 {
     if (activeSession()->state() != ca::SessionState::Connected) {
-        appendLog(QStringLiteral("[边界] 调度拒绝：会话未连接（请先打开连接）"));
+        appendLog(QStringLiteral("[边界] 发送拒绝：会话未连接（请先打开连接）"));
         return;
     }
     if (!activeSchedTaskId_.isNull() && scheduler_.hasTask(activeSchedTaskId_)) {
-        appendLog(QStringLiteral("[边界] 调度拒绝：已有调度任务运行中，请先停止"));
+        appendLog(QStringLiteral("[边界] 发送拒绝：已有发送任务运行中，请先停止"));
         return;
     }
 
@@ -1550,30 +1798,23 @@ void MainWindow::onSchedStartClicked()
     QVector<QVariantMap> attrs;
     QString err;
     if (!sendListTable_ || sendListTable_->rowCount() == 0) {
-        appendLog(QStringLiteral("[边界] 调度拒绝：发送列表为空，请添加行或导入 txt/csv"));
+        appendLog(QStringLiteral("[边界] 发送拒绝：发送列表为空，请添加行或导入 txt/csv"));
         return;
     }
 
+    const int defaultInterval = schedIntervalSpin_ ? schedIntervalSpin_->value() : 1000;
     for (int r = 0; r < sendListTable_->rowCount(); ++r) {
-        QTableWidgetItem* enItem = sendListTable_->item(r, 0);
-        if (!enItem || enItem->checkState() != Qt::Checked)
+        if (!isSendListRowEnabled(r))
             continue;
         const QString payload = sendListTable_->item(r, 2)
                                     ? sendListTable_->item(r, 2)->text().trimmed()
                                     : QString();
         if (payload.isEmpty()) {
-            appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行载荷为空").arg(r + 1));
+            appendLog(QStringLiteral("[边界] 发送拒绝：第 %1 行载荷为空").arg(r + 1));
             return;
         }
-        int intervalMs = schedIntervalSpin_ ? schedIntervalSpin_->value() : 1000;
-        if (sendListTable_->item(r, 3)) {
-            bool ok = false;
-            const int v = sendListTable_->item(r, 3)->text().toInt(&ok);
-            if (ok && v >= 0)
-                intervalMs = v;
-        }
         int format = FormatAuto;
-        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 4)))
+        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 3)))
             format = combo->currentData().toInt();
 
         if (isLegacyMode()) {
@@ -1581,12 +1822,12 @@ void MainWindow::onSchedStartClicked()
             QString e;
             const ca::Result built = buildLegacySendRequestFrom(payload, format, &probe, &e);
             if (!built.ok) {
-                appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行 — %2").arg(r + 1).arg(e.isEmpty() ? built.message : e));
+                appendLog(QStringLiteral("[边界] 发送拒绝：第 %1 行 — %2").arg(r + 1).arg(e.isEmpty() ? built.message : e));
                 return;
             }
             payloads.push_back(probe.payload);
             attrs.push_back(probe.attributes);
-            intervals.push_back(intervalMs);
+            intervals.push_back(defaultInterval);
             formats.push_back(format);
         } else {
             QByteArray bytes;
@@ -1594,7 +1835,7 @@ void MainWindow::onSchedStartClicked()
             if (format == FormatHex) {
                 bytes = ca::parseHexPayloadStrict(payload, &e);
                 if (!e.isEmpty()) {
-                    appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行十六进制 — %2").arg(r + 1).arg(e));
+                    appendLog(QStringLiteral("[边界] 发送拒绝：第 %1 行十六进制 — %2").arg(r + 1).arg(e));
                     return;
                 }
             } else if (preferHexSend()) {
@@ -1603,7 +1844,7 @@ void MainWindow::onSchedStartClicked()
                     e.clear();
                     bytes = payload.toUtf8();
                 } else if (!e.isEmpty()) {
-                    appendLog(QStringLiteral("[边界] 调度拒绝：第 %1 行十六进制 — %2").arg(r + 1).arg(e));
+                    appendLog(QStringLiteral("[边界] 发送拒绝：第 %1 行十六进制 — %2").arg(r + 1).arg(e));
                     return;
                 }
             } else {
@@ -1611,13 +1852,13 @@ void MainWindow::onSchedStartClicked()
             }
             payloads.push_back(bytes);
             attrs.push_back(QVariantMap());
-            intervals.push_back(intervalMs);
+            intervals.push_back(defaultInterval);
             formats.push_back(format);
         }
     }
 
     if (payloads.isEmpty()) {
-        appendLog(QStringLiteral("[边界] 调度拒绝：没有勾选启用的列表行"));
+        appendLog(QStringLiteral("[边界] 发送拒绝：没有勾选启用的列表行"));
         return;
     }
     Q_UNUSED(formats);
@@ -1626,31 +1867,34 @@ void MainWindow::onSchedStartClicked()
     ca::ScheduleTaskSpec spec;
     const ca::ScheduleMode userMode =
         static_cast<ca::ScheduleMode>(schedModeCombo_->currentData().toInt());
-    spec.mode = userMode;
-    spec.maxCount = schedCountSpin_->value();
-    if (payloads.size() > 1) {
-        if (userMode == ca::ScheduleMode::Once) {
-            appendLog(QStringLiteral("提示：调度模式为「单次」，列表存在多行时仅发送首个已启用行"));
-            payloads.resize(1);
-            attrs.resize(1);
-            intervals.resize(1);
+    // 单次：多勾选行按顺序发完一轮后停止；周期循环：按行轮转直至手动停止
+    if (userMode == ca::ScheduleMode::Once) {
+        if (payloads.size() == 1) {
+            spec.mode = ca::ScheduleMode::Once;
+            spec.maxCount = 0;
         } else {
             spec.mode = ca::ScheduleMode::RoundRobin;
-            if (userMode == ca::ScheduleMode::Infinite)
-                spec.maxCount = 0; // RoundRobin 下 0 = 无限
+            spec.maxCount = payloads.size();
         }
+    } else if (userMode == ca::ScheduleMode::Counted) {
+        spec.mode = payloads.size() > 1 ? ca::ScheduleMode::RoundRobin : ca::ScheduleMode::Counted;
+        spec.maxCount = schedCountSpin_ ? schedCountSpin_->value() : 1;
+    } else {
+        // 周期循环（含原轮询/周期）：多行轮转，单行反复；不限次数
+        spec.mode = ca::ScheduleMode::RoundRobin;
+        spec.maxCount = 0;
     }
 
     spec.payloads = payloads;
     spec.payloadAttributes = attrs;
     spec.payloadIntervals = intervals;
-    spec.intervalMs = schedIntervalSpin_->value();
+    spec.intervalMs = defaultInterval;
     if (!isLegacyMode() && session_.activeTransportKind() == ca::TransportKind::TcpServer && clientCombo_) {
         spec.channelId = clientCombo_->currentData().toString();
         spec.broadcast = spec.channelId.isEmpty();
     }
 
-    appendLog(QStringLiteral("提示：发送列表调度共 %1 组").arg(payloads.size()));
+    appendLog(QStringLiteral("提示：发送列表共 %1 组（仅勾选启用行）").arg(payloads.size()));
     for (int i = 0; i < payloads.size(); ++i)
         appendData(QStringLiteral("[TX][Sched#%1] %2").arg(i + 1).arg(QString::fromUtf8(payloads.at(i))));
 
@@ -1660,11 +1904,11 @@ void MainWindow::onSchedStartClicked()
     const ca::Result r = scheduler_.startTask(spec);
     if (!r.ok) {
         activeSchedTaskId_ = QUuid();
-        appendLog(QStringLiteral("[异常] 调度启动失败：%1").arg(r.message));
+        appendLog(QStringLiteral("[异常] 发送启动失败：%1").arg(r.message));
         syncUi();
         return;
     }
-    appendLog(QStringLiteral("[连接] 调度已启动"));
+    appendLog(QStringLiteral("[连接] 发送已启动"));
     syncUi();
 }
 
@@ -1711,12 +1955,16 @@ void MainWindow::onSchedTaskFailed(const QUuid& taskId, const QString& code, con
     syncUi();
 }
 
+void MainWindow::onClearDataClicked()
+{
+    if (dataView_)
+        dataView_->clear();
+}
+
 void MainWindow::onClearLogClicked()
 {
     if (log_)
         log_->clear();
-    if (dataView_)
-        dataView_->clear();
 }
 
 void MainWindow::onRecordReceived(const ca::CommRecord& record)
@@ -1883,9 +2131,30 @@ void MainWindow::ensureSendListHeaders()
 {
     if (!sendListTable_)
         return;
+    sendListTable_->setColumnCount(4);
     sendListTable_->setHorizontalHeaderLabels(
         QStringList() << QStringLiteral("启用") << QStringLiteral("名称") << QStringLiteral("载荷")
-                      << QStringLiteral("延时ms") << QStringLiteral("格式"));
+                      << QStringLiteral("格式"));
+}
+
+bool MainWindow::isSendListRowEnabled(int row) const
+{
+    if (!sendListTable_ || row < 0 || row >= sendListTable_->rowCount())
+        return false;
+    QTableWidgetItem* enItem = sendListTable_->item(row, 0);
+    return enItem && enItem->checkState() == Qt::Checked;
+}
+
+QList<int> MainWindow::enabledSendListRows() const
+{
+    QList<int> rows;
+    if (!sendListTable_)
+        return rows;
+    for (int r = 0; r < sendListTable_->rowCount(); ++r) {
+        if (isSendListRowEnabled(r))
+            rows.push_back(r);
+    }
+    return rows;
 }
 
 QString MainWindow::formatName(int format)
@@ -1912,8 +2181,7 @@ int MainWindow::formatFromName(const QString& name)
     return FormatAuto;
 }
 
-void MainWindow::addSendListRow(bool enabled, const QString& name, const QString& payload, int intervalMs,
-                                int format)
+void MainWindow::addSendListRow(bool enabled, const QString& name, const QString& payload, int format)
 {
     if (!sendListTable_)
         return;
@@ -1921,12 +2189,11 @@ void MainWindow::addSendListRow(bool enabled, const QString& name, const QString
     sendListTable_->insertRow(row);
 
     auto* en = new QTableWidgetItem;
-    en->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    en->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
     en->setCheckState(enabled ? Qt::Checked : Qt::Unchecked);
     sendListTable_->setItem(row, 0, en);
     sendListTable_->setItem(row, 1, new QTableWidgetItem(name));
     sendListTable_->setItem(row, 2, new QTableWidgetItem(payload));
-    sendListTable_->setItem(row, 3, new QTableWidgetItem(QString::number(intervalMs)));
 
     auto* fmt = new QComboBox(sendListTable_);
     fmt->addItem(QStringLiteral("自动"), FormatAuto);
@@ -1935,7 +2202,7 @@ void MainWindow::addSendListRow(bool enabled, const QString& name, const QString
     fmt->addItem(QStringLiteral("十六进制"), FormatHex);
     const int idx = fmt->findData(format);
     fmt->setCurrentIndex(idx >= 0 ? idx : 0);
-    sendListTable_->setCellWidget(row, 4, fmt);
+    sendListTable_->setCellWidget(row, 3, fmt);
 }
 
 bool MainWindow::collectEnabledListPayloads(QVector<QByteArray>* outPayloads, QVector<int>* outFormats,
@@ -1952,8 +2219,7 @@ bool MainWindow::collectEnabledListPayloads(QVector<QByteArray>* outPayloads, QV
         return false;
     }
     for (int r = 0; r < sendListTable_->rowCount(); ++r) {
-        QTableWidgetItem* enItem = sendListTable_->item(r, 0);
-        if (!enItem || enItem->checkState() != Qt::Checked)
+        if (!isSendListRowEnabled(r))
             continue;
         const QString payload = sendListTable_->item(r, 2)
                                     ? sendListTable_->item(r, 2)->text().trimmed()
@@ -1964,7 +2230,7 @@ bool MainWindow::collectEnabledListPayloads(QVector<QByteArray>* outPayloads, QV
             return false;
         }
         int format = FormatAuto;
-        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 4)))
+        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 3)))
             format = combo->currentData().toInt();
         outPayloads->push_back(payload.toUtf8());
         if (outFormats)
@@ -1981,20 +2247,72 @@ bool MainWindow::collectEnabledListPayloads(QVector<QByteArray>* outPayloads, QV
 void MainWindow::onSendListAddRow()
 {
     addSendListRow(true, QStringLiteral("条目%1").arg(sendListTable_->rowCount() + 1),
-                   QStringLiteral("0,0"), 1000, isLegacyMode() ? FormatValues : FormatAuto);
+                   QStringLiteral("0,0"), isLegacyMode() ? FormatValues : FormatAuto);
 }
 
 void MainWindow::onSendListRemoveRows()
 {
     if (!sendListTable_)
         return;
-    const auto ranges = sendListTable_->selectionModel()->selectedRows();
-    QList<int> rows;
-    for (const QModelIndex& idx : ranges)
-        rows.push_back(idx.row());
+    // 删除「启用」勾选行，不以鼠标行选为准
+    QList<int> rows = enabledSendListRows();
+    if (rows.isEmpty()) {
+        appendLog(QStringLiteral("[边界] 删除拒绝：请先勾选「启用」列中的目标行"));
+        return;
+    }
     std::sort(rows.begin(), rows.end(), std::greater<int>());
     for (int r : rows)
         sendListTable_->removeRow(r);
+    appendLog(QStringLiteral("[连接] 已删除勾选行，剩余 %1 行").arg(sendListTable_->rowCount()));
+}
+
+void MainWindow::onSendListClearAll()
+{
+    if (!sendListTable_)
+        return;
+    sendListTable_->setRowCount(0);
+    appendLog(QStringLiteral("[连接] 发送列表已全部清空"));
+}
+
+void MainWindow::onSendListContextMenu(const QPoint& pos)
+{
+    if (!sendListTable_)
+        return;
+    QMenu menu(sendListTable_);
+    QAction* actAdd = menu.addAction(QStringLiteral("添加行"));
+    QAction* actEnable = menu.addAction(QStringLiteral("勾选当前行"));
+    QAction* actDisable = menu.addAction(QStringLiteral("取消勾选当前行"));
+    menu.addSeparator();
+    QAction* actDelChecked = menu.addAction(QStringLiteral("删除勾选行"));
+    QAction* actClear = menu.addAction(QStringLiteral("全部清空"));
+    QAction* chosen = menu.exec(sendListTable_->viewport()->mapToGlobal(pos));
+    if (!chosen)
+        return;
+    if (chosen == actAdd) {
+        onSendListAddRow();
+        return;
+    }
+    if (chosen == actClear) {
+        onSendListClearAll();
+        return;
+    }
+    if (chosen == actDelChecked) {
+        onSendListRemoveRows();
+        return;
+    }
+    const int row = sendListTable_->rowAt(pos.y());
+    if (row < 0)
+        return;
+    QTableWidgetItem* en = sendListTable_->item(row, 0);
+    if (!en) {
+        en = new QTableWidgetItem;
+        en->setFlags(Qt::ItemIsUserCheckable | Qt::ItemIsEnabled);
+        sendListTable_->setItem(row, 0, en);
+    }
+    if (chosen == actEnable)
+        en->setCheckState(Qt::Checked);
+    else if (chosen == actDisable)
+        en->setCheckState(Qt::Unchecked);
 }
 
 void MainWindow::onSendListImport()
@@ -2027,83 +2345,6 @@ void MainWindow::onSendListExport()
         return;
     }
     appendLog(QStringLiteral("[连接] 已导出发送列表：%1").arg(path));
-}
-
-void MainWindow::onSendListSendSelected()
-{
-    if (activeSession()->state() != ca::SessionState::Connected) {
-        appendLog(QStringLiteral("[边界] 发送拒绝：会话未连接"));
-        return;
-    }
-    if (!sendListTable_)
-        return;
-
-    // 与调度一致：只处理「启用」勾选行，不以鼠标高亮为准
-    int sent = 0;
-    for (int r = 0; r < sendListTable_->rowCount(); ++r) {
-        QTableWidgetItem* enItem = sendListTable_->item(r, 0);
-        if (!enItem || enItem->checkState() != Qt::Checked)
-            continue;
-        const QString payload =
-            sendListTable_->item(r, 2) ? sendListTable_->item(r, 2)->text().trimmed() : QString();
-        int format = FormatAuto;
-        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 4)))
-            format = combo->currentData().toInt();
-
-        if (isLegacyMode()) {
-            ca::SendRequest req;
-            QString err;
-            const ca::Result built = buildLegacySendRequestFrom(payload, format, &req, &err);
-            if (!built.ok) {
-                appendLog(QStringLiteral("[边界] 发送拒绝：第 %1 行 — %2")
-                              .arg(r + 1)
-                              .arg(err.isEmpty() ? built.message : err));
-                continue;
-            }
-            const ca::Result sr = legacySession_.send(req);
-            if (!sr.ok)
-                appendLog(QStringLiteral("[异常] 第 %1 行发送失败：%2").arg(r + 1).arg(sr.message));
-            else
-                ++sent;
-            continue;
-        }
-
-        QByteArray bytes;
-        QString err;
-        if (format == FormatHex) {
-            bytes = ca::parseHexPayloadStrict(payload, &err);
-        } else if (preferHexSend()) {
-            bytes = ca::parseHexPayloadStrict(payload, &err);
-            // 与单条一致：侧栏勾选 HEX 时，非法字符按 UTF-8 明文发出
-            if (bytes.isEmpty() && err.contains(QStringLiteral("非法十六进制字符"))) {
-                err.clear();
-                bytes = payload.toUtf8();
-            }
-        } else {
-            bytes = payload.toUtf8();
-        }
-        if (!err.isEmpty() || bytes.isEmpty()) {
-            appendLog(QStringLiteral("[边界] 发送拒绝：第 %1 行 — %2")
-                          .arg(r + 1)
-                          .arg(err.isEmpty() ? QStringLiteral("载荷为空") : err));
-            continue;
-        }
-        ca::SendRequest req;
-        req.requestId = QUuid::createUuid();
-        req.sessionId = session_.sessionId();
-        req.payload = bytes;
-        fillChannelOnRequest(&req);
-        const ca::Result sr = session_.send(req);
-        if (!sr.ok)
-            appendLog(QStringLiteral("[异常] 第 %1 行发送失败：%2").arg(r + 1).arg(sr.message));
-        else
-            ++sent;
-    }
-
-    if (sent == 0)
-        appendLog(QStringLiteral("[边界] 发送拒绝：没有勾选启用的列表行，或启用行均未发送成功"));
-    else
-        appendLog(QStringLiteral("[连接] 已按启用行发送 %1 组").arg(sent));
 }
 
 bool MainWindow::importSendListFile(const QString& path, QString* error)
@@ -2141,11 +2382,10 @@ bool MainWindow::importSendListFile(const QString& path, QString* error)
         bool enabled = true;
         QString name = QStringLiteral("导入%1").arg(loaded + 1);
         QString payload;
-        int intervalMs = schedIntervalSpin_ ? schedIntervalSpin_->value() : 1000;
         int format = FormatAuto;
 
         if (asCsv) {
-            // 简易 CSV：enabled,name,payload,interval_ms,mode（payload 可用双引号包裹）
+            // 简易 CSV：enabled,name,payload[,interval_ms][,mode]；interval 列兼容旧文件但忽略
             QStringList cols;
             QString cur;
             bool inQ = false;
@@ -2168,14 +2408,17 @@ bool MainWindow::importSendListFile(const QString& path, QString* error)
                             || cols.at(0).trimmed().compare(QStringLiteral("false"), Qt::CaseInsensitive) == 0);
                 name = cols.at(1).trimmed();
                 payload = cols.at(2).trimmed();
-                if (cols.size() >= 4) {
-                    bool ok = false;
-                    const int v = cols.at(3).trimmed().toInt(&ok);
-                    if (ok)
-                        intervalMs = v;
-                }
+                // 旧 5 列：col3=interval，col4=format；新 4 列：col3=format
                 if (cols.size() >= 5)
                     format = formatFromName(cols.at(4));
+                else if (cols.size() == 4) {
+                    bool ok = false;
+                    cols.at(3).trimmed().toInt(&ok);
+                    if (!ok)
+                        format = formatFromName(cols.at(3));
+                    else if (cols.size() > 4)
+                        format = formatFromName(cols.at(4));
+                }
             } else if (cols.size() == 1) {
                 payload = cols.at(0).trimmed();
             } else {
@@ -2189,7 +2432,7 @@ bool MainWindow::importSendListFile(const QString& path, QString* error)
 
         if (payload.isEmpty())
             continue;
-        addSendListRow(enabled, name, payload, intervalMs, format);
+        addSendListRow(enabled, name, payload, format);
         ++loaded;
     }
     if (loaded == 0) {
@@ -2217,15 +2460,14 @@ bool MainWindow::exportSendListFile(const QString& path, QString* error) const
     out.setCodec("UTF-8");
     const bool asCsv = path.endsWith(QStringLiteral(".csv"), Qt::CaseInsensitive);
     if (asCsv)
-        out << QStringLiteral("enabled,name,payload,interval_ms,mode\n");
+        out << QStringLiteral("enabled,name,payload,mode\n");
 
     for (int r = 0; r < sendListTable_->rowCount(); ++r) {
-        const bool en = sendListTable_->item(r, 0) && sendListTable_->item(r, 0)->checkState() == Qt::Checked;
+        const bool en = isSendListRowEnabled(r);
         const QString name = sendListTable_->item(r, 1) ? sendListTable_->item(r, 1)->text() : QString();
         const QString payload = sendListTable_->item(r, 2) ? sendListTable_->item(r, 2)->text() : QString();
-        const QString interval = sendListTable_->item(r, 3) ? sendListTable_->item(r, 3)->text() : QStringLiteral("1000");
         int format = FormatAuto;
-        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 4)))
+        if (auto* combo = qobject_cast<QComboBox*>(sendListTable_->cellWidget(r, 3)))
             format = combo->currentData().toInt();
         if (asCsv) {
             QString p = payload;
@@ -2233,11 +2475,285 @@ bool MainWindow::exportSendListFile(const QString& path, QString* error) const
             out << (en ? QStringLiteral("1") : QStringLiteral("0")) << QLatin1Char(',')
                 << QLatin1Char('"') << name << QLatin1Char('"') << QLatin1Char(',')
                 << QLatin1Char('"') << p << QLatin1Char('"') << QLatin1Char(',')
-                << interval << QLatin1Char(',')
                 << formatName(format) << QLatin1Char('\n');
         } else {
             out << payload << QLatin1Char('\n');
         }
     }
     return true;
+}
+
+void MainWindow::buildNativeAssistOptions()
+{
+    // 接收区：HEX+ASCII 对照（贴近常见串口助手）
+    if (hexDisplayCheck_ && hexDisplayCheck_->parentWidget()) {
+        auto* parentLay = qobject_cast<QVBoxLayout*>(hexDisplayCheck_->parentWidget()->layout());
+        if (parentLay) {
+            hexAsciiCheck_ = new QCheckBox(QStringLiteral("接收对照 ASCII/HEX"), hexDisplayCheck_->parentWidget());
+            hexAsciiCheck_->setObjectName(QStringLiteral("hexAsciiCheck"));
+            hexAsciiCheck_->setToolTip(
+                QStringLiteral("在数据窗额外显示可读 ASCII 或 HEX，便于对照；不影响收发字节本身"));
+            const int idx = parentLay->indexOf(hexDisplayCheck_);
+            parentLay->insertWidget(idx >= 0 ? idx + 1 : parentLay->count(), hexAsciiCheck_);
+            connect(hexAsciiCheck_, &QCheckBox::toggled, this, [this](bool) { syncUi(); });
+        }
+    }
+
+    // 发送区：发送后清空单条编辑框
+    if (hexSendCheck_ && hexSendCheck_->parentWidget()) {
+        QVBoxLayout* parentLay = qobject_cast<QVBoxLayout*>(hexSendCheck_->parentWidget()->layout());
+        if (!parentLay && ui_.secSend && ui_.secSend->parentWidget())
+            parentLay = qobject_cast<QVBoxLayout*>(ui_.secSend->parentWidget()->layout());
+        if (parentLay) {
+            clearAfterSendCheck_ =
+                new QCheckBox(QStringLiteral("发送后清空单条内容"), hexSendCheck_->parentWidget());
+            clearAfterSendCheck_->setObjectName(QStringLiteral("clearAfterSendCheck"));
+            clearAfterSendCheck_->setToolTip(QStringLiteral("单条发送成功后清空编辑框（列表/波形不受影响）"));
+            const int idx = parentLay->indexOf(hexSendCheck_);
+            parentLay->insertWidget(idx >= 0 ? idx + 1 : parentLay->count(), clearAfterSendCheck_);
+        }
+    }
+}
+
+void MainWindow::polishPlainSpin(QAbstractSpinBox* box)
+{
+    if (!box)
+        return;
+    box->setButtonSymbols(QAbstractSpinBox::NoButtons);
+    box->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+}
+
+// 构建「波形发送」页：对齐发送列表的扁平行控件与底部说明风格
+void MainWindow::buildWaveformTab()
+{
+    if (!sendTabs_)
+        return;
+    if (sendTabs_->findChild<QWidget*>(QStringLiteral("tabWave")))
+        return;
+
+    auto* page = new QWidget(sendTabs_);
+    page->setObjectName(QStringLiteral("tabWave"));
+    auto* root = new QVBoxLayout(page);
+    // 边距对齐发送列表，行距略松以免表单显得挤
+    root->setContentsMargins(8, 8, 8, 8);
+    root->setSpacing(10);
+
+    // 数值框统一：去箭头、定高、固定宽度（避免拉满行宽）
+    auto polishField = [this](QAbstractSpinBox* box, int width = 160) {
+        polishPlainSpin(box);
+        box->setFixedHeight(26);
+        box->setFixedWidth(width);
+        box->setSizePolicy(QSizePolicy::Fixed, QSizePolicy::Fixed);
+    };
+
+    // 表单标签：统一列宽与既有 FieldLabel 样式
+    auto makeLabel = [page](const QString& text) {
+        auto* lab = new QLabel(text, page);
+        lab->setObjectName(QStringLiteral("FieldLabel"));
+        lab->setMinimumWidth(56);
+        lab->setAlignment(Qt::AlignLeft | Qt::AlignVCenter);
+        return lab;
+    };
+
+    // 波形参数：双列网格，行距放宽便于扫视与点击
+    auto* paramGrid = new QGridLayout();
+    paramGrid->setContentsMargins(0, 2, 0, 2);
+    paramGrid->setHorizontalSpacing(18);
+    paramGrid->setVerticalSpacing(12);
+    paramGrid->setColumnStretch(4, 1);
+
+    waveAmpSpin_ = new QDoubleSpinBox(page);
+    waveAmpSpin_->setRange(0.0, 1e9);
+    waveAmpSpin_->setDecimals(4);
+    waveAmpSpin_->setValue(10.0);
+    polishField(waveAmpSpin_);
+    paramGrid->addWidget(makeLabel(QStringLiteral("幅值")), 0, 0);
+    paramGrid->addWidget(waveAmpSpin_, 0, 1);
+
+    waveFreqSpin_ = new QDoubleSpinBox(page);
+    waveFreqSpin_->setRange(0.0, 1e6);
+    waveFreqSpin_->setDecimals(4);
+    waveFreqSpin_->setValue(1.0);
+    waveFreqSpin_->setSuffix(QStringLiteral(" Hz"));
+    polishField(waveFreqSpin_);
+    paramGrid->addWidget(makeLabel(QStringLiteral("频率")), 0, 2);
+    paramGrid->addWidget(waveFreqSpin_, 0, 3);
+
+    wavePhaseSpin_ = new QDoubleSpinBox(page);
+    wavePhaseSpin_->setRange(-360.0, 360.0);
+    wavePhaseSpin_->setDecimals(2);
+    wavePhaseSpin_->setValue(0.0);
+    wavePhaseSpin_->setSuffix(QStringLiteral(" °"));
+    polishField(wavePhaseSpin_);
+    paramGrid->addWidget(makeLabel(QStringLiteral("初相")), 1, 0);
+    paramGrid->addWidget(wavePhaseSpin_, 1, 1);
+
+    waveOffsetSpin_ = new QDoubleSpinBox(page);
+    waveOffsetSpin_->setRange(-1e9, 1e9);
+    waveOffsetSpin_->setDecimals(4);
+    waveOffsetSpin_->setValue(0.0);
+    polishField(waveOffsetSpin_);
+    paramGrid->addWidget(makeLabel(QStringLiteral("偏置")), 1, 2);
+    paramGrid->addWidget(waveOffsetSpin_, 1, 3);
+
+    waveNoiseSpin_ = new QDoubleSpinBox(page);
+    waveNoiseSpin_->setRange(0.0, 1e6);
+    waveNoiseSpin_->setDecimals(4);
+    waveNoiseSpin_->setValue(0.0);
+    waveNoiseSpin_->setToolTip(QStringLiteral("高斯噪声标准差；0 表示纯正弦"));
+    polishField(waveNoiseSpin_);
+    paramGrid->addWidget(makeLabel(QStringLiteral("噪声σ")), 2, 0);
+    paramGrid->addWidget(waveNoiseSpin_, 2, 1);
+
+    waveChannelsSpin_ = new QSpinBox(page);
+    waveChannelsSpin_->setRange(1, 16);
+    waveChannelsSpin_->setValue(recommendedWaveChannels());
+    polishField(waveChannelsSpin_, 80);
+    paramGrid->addWidget(makeLabel(QStringLiteral("通道数")), 2, 2);
+    paramGrid->addWidget(waveChannelsSpin_, 2, 3);
+
+    waveSeedSpin_ = new QSpinBox(page);
+    waveSeedSpin_->setRange(1, 2147483647);
+    waveSeedSpin_->setValue(1);
+    polishField(waveSeedSpin_, 120);
+    paramGrid->addWidget(makeLabel(QStringLiteral("随机种子")), 3, 0);
+    paramGrid->addWidget(waveSeedSpin_, 3, 1);
+    root->addLayout(paramGrid);
+
+    // 节奏行：对齐发送列表底部「模式/间隔/次数」扁平行
+    auto* paceRow = new QHBoxLayout();
+    paceRow->setContentsMargins(0, 4, 0, 0);
+    paceRow->setSpacing(8);
+
+    waveIntervalSpin_ = new QSpinBox(page);
+    waveIntervalSpin_->setRange(1, 3600000);
+    waveIntervalSpin_->setValue(100);
+    waveIntervalSpin_->setSuffix(QStringLiteral(" ms 间隔"));
+    polishField(waveIntervalSpin_, 140);
+    paceRow->addWidget(waveIntervalSpin_);
+
+    waveCountSpin_ = new QSpinBox(page);
+    waveCountSpin_->setRange(1, 1000000);
+    waveCountSpin_->setValue(100);
+    waveCountSpin_->setPrefix(QStringLiteral("次数 "));
+    polishField(waveCountSpin_, 120);
+    paceRow->addWidget(waveCountSpin_);
+
+    waveInfiniteCheck_ = new QCheckBox(QStringLiteral("无限"), page);
+    paceRow->addWidget(waveInfiniteCheck_);
+    connect(waveInfiniteCheck_, &QCheckBox::toggled, this, [this](bool on) {
+        if (waveCountSpin_)
+            waveCountSpin_->setEnabled(!on);
+    });
+
+    waveNativeHexCheck_ = new QCheckBox(QStringLiteral("原生按 HEX 发出"), page);
+    waveNativeHexCheck_->setToolTip(QStringLiteral("仅原生通道：将 CSV 文本再编码为 HEX 字节发出；兼容模式忽略"));
+    paceRow->addWidget(waveNativeHexCheck_);
+    paceRow->addStretch(1);
+    root->addLayout(paceRow);
+
+    // 启停行：与发送列表「发送/暂停/继续/停止」同款 SecondaryButton
+    auto* ctrl = new QHBoxLayout();
+    ctrl->setContentsMargins(0, 2, 0, 0);
+    ctrl->setSpacing(6);
+    btnWaveStart_ = new QPushButton(QStringLiteral("启动波形"), page);
+    btnWavePause_ = new QPushButton(QStringLiteral("暂停"), page);
+    btnWaveResume_ = new QPushButton(QStringLiteral("继续"), page);
+    btnWaveStop_ = new QPushButton(QStringLiteral("停止"), page);
+    for (QPushButton* b : {btnWaveStart_, btnWavePause_, btnWaveResume_, btnWaveStop_}) {
+        b->setObjectName(QStringLiteral("SecondaryButton"));
+        ctrl->addWidget(b);
+    }
+    ctrl->addStretch(1);
+    root->addLayout(ctrl);
+
+    waveHintLabel_ = new QLabel(page);
+    waveHintLabel_->setObjectName(QStringLiteral("CapTip"));
+    waveHintLabel_->setWordWrap(true);
+    waveHintLabel_->setText(
+        QStringLiteral("按间隔采样正弦并发送；可加噪声。本页支持暂停/继续/停止。"));
+    root->addWidget(waveHintLabel_);
+    root->addStretch(1);
+
+    sendTabs_->addTab(page, QStringLiteral("波形发送"));
+    sendTabs_->setMinimumHeight(360);
+    sendTabs_->setMaximumHeight(440);
+
+    // 侧栏/列表数值框同步去箭头（保留可编辑）
+    for (QAbstractSpinBox* box : findChildren<QAbstractSpinBox*>())
+        polishPlainSpin(box);
+}
+
+void MainWindow::onWaveSchedStartClicked()
+{
+    if (activeSession()->state() != ca::SessionState::Connected) {
+        appendLog(QStringLiteral("[边界] 发送拒绝：会话未连接（请先打开连接）"));
+        return;
+    }
+    if (!activeSchedTaskId_.isNull() && scheduler_.hasTask(activeSchedTaskId_)) {
+        appendLog(QStringLiteral("[边界] 发送拒绝：已有发送任务运行中，请先停止"));
+        return;
+    }
+
+    if (isLegacyMode()) {
+        const ca::LegacyCapabilityProfile& p = legacySession_.capabilityProfile();
+        if (!p.supports(ca::LegacyCapability::SendEncodedValues)) {
+            const QString lim =
+                p.entries.value(static_cast<int>(ca::LegacyCapability::SendEncodedValues)).limitation;
+            appendLog(QStringLiteral("[边界] 波形拒绝：当前协议不能发数值%1")
+                          .arg(lim.isEmpty() ? QString() : QStringLiteral("（%1）").arg(lim)));
+            return;
+        }
+        if (preferHexSend()) {
+            appendLog(QStringLiteral("[边界] 波形拒绝：兼容模式请取消「十六进制发送」"));
+            return;
+        }
+    }
+
+    ca::ScheduleTaskSpec spec;
+    spec.taskId = QUuid::createUuid();
+    spec.mode = ca::ScheduleMode::Waveform;
+    spec.intervalMs = waveIntervalSpin_ ? waveIntervalSpin_->value() : 100;
+    const bool infinite = waveInfiniteCheck_ && waveInfiniteCheck_->isChecked();
+    spec.maxCount = infinite ? 0 : (waveCountSpin_ ? waveCountSpin_->value() : 100);
+
+    ca::WaveformGenerator::Config cfg;
+    cfg.amplitude = waveAmpSpin_ ? waveAmpSpin_->value() : 10.0;
+    cfg.frequencyHz = waveFreqSpin_ ? waveFreqSpin_->value() : 1.0;
+    cfg.phaseRad = (wavePhaseSpin_ ? wavePhaseSpin_->value() : 0.0) * 3.14159265358979323846 / 180.0;
+    cfg.offset = waveOffsetSpin_ ? waveOffsetSpin_->value() : 0.0;
+    cfg.noiseStd = waveNoiseSpin_ ? waveNoiseSpin_->value() : 0.0;
+    cfg.channels = waveChannelsSpin_ ? waveChannelsSpin_->value() : 2;
+    cfg.seed = static_cast<quint32>(waveSeedSpin_ ? waveSeedSpin_->value() : 1);
+    cfg.staggerChannels = true;
+    spec.waveform = cfg;
+
+    if (isLegacyMode()) {
+        QVariantMap attrs;
+        attrs.insert(QStringLiteral("legacySend"), QStringLiteral("values"));
+        attrs.insert(QStringLiteral("protocolLabel"), currentLegacyProtocolLabel());
+        spec.attributesTemplate = attrs;
+        spec.nativeHexEncode = false;
+        scheduler_.setSession(&legacySession_);
+    } else {
+        spec.nativeHexEncode = waveNativeHexCheck_ && waveNativeHexCheck_->isChecked();
+        scheduler_.setSession(&session_);
+        if (session_.activeTransportKind() == ca::TransportKind::TcpServer) {
+            if (clientCombo_)
+                spec.channelId = clientCombo_->currentData().toString();
+            spec.broadcast = spec.channelId.isEmpty();
+        }
+    }
+
+    const ca::Result r = scheduler_.startTask(spec);
+    if (!r.ok) {
+        appendLog(QStringLiteral("[边界] 波形启动失败：%1").arg(r.message));
+        return;
+    }
+    activeSchedTaskId_ = spec.taskId;
+    appendLog(QStringLiteral("[连接] 波形发送已启动（间隔 %1 ms，通道 %2，f=%3 Hz）")
+                  .arg(spec.intervalMs)
+                  .arg(cfg.channels)
+                  .arg(cfg.frequencyHz, 0, 'g', 6));
+    syncUi();
 }

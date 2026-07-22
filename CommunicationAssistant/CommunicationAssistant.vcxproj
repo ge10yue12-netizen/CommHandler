@@ -65,11 +65,11 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <OutDir>$(ProjectDir)x64\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)x64\$(Configuration)\</IntDir>
+    <IntDir>$(ProjectDir)x64\$(Configuration)\obj\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Release|x64'">
     <OutDir>$(ProjectDir)x64\$(Configuration)\</OutDir>
-    <IntDir>$(ProjectDir)x64\$(Configuration)\</IntDir>
+    <IntDir>$(ProjectDir)x64\$(Configuration)\obj\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|x64'">
     <ClCompile>
@@ -94,9 +94,7 @@
       <Command>if exist "$(ProjectDir)runtime\*" copy /Y "$(ProjectDir)runtime\*" "$(OutDir)" &gt;nul 2&gt;&amp;1
 if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
 if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" "E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$(OutDir)CommunicationAssistant.exe"
+if exist "$(ProjectDir)..\QtExeTool.bat" call "$(ProjectDir)..\QtExeTool.bat" "$(OutDir)CommunicationAssistant.exe" fix nopause
 exit /B 0
 </Command>
     </PostBuildEvent>
@@ -124,9 +122,7 @@ exit /B 0
       <Command>if exist "$(ProjectDir)runtime\*" copy /Y "$(ProjectDir)runtime\*" "$(OutDir)" &gt;nul 2&gt;&amp;1
 if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
 if exist "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" copy /Y "$(ProjectDir)..\CommHandler\x64\Release\CommHandler.pdb" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5Network.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" copy /Y "E:\Qt\5.15.2\msvc2019_64\bin\Qt5SerialPort.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" "E:\Qt\5.15.2\msvc2019_64\bin\windeployqt.exe" --release --no-translations --no-system-d3d-compiler "$(OutDir)CommunicationAssistant.exe"
+if exist "$(ProjectDir)..\QtExeTool.bat" call "$(ProjectDir)..\QtExeTool.bat" "$(OutDir)CommunicationAssistant.exe" fix nopause
 exit /B 0
 </Command>
     </PostBuildEvent>
@@ -140,6 +136,7 @@ exit /B 0
     <ClCompile Include="transport\UdpTransport.cpp" />
     <ClCompile Include="session\NativeSession.cpp" />
     <ClCompile Include="services\SendScheduler.cpp" />
+    <ClCompile Include="services\WaveformGenerator.cpp" />
     <ClCompile Include="capture\CaptureWriter.cpp" />
     <ClCompile Include="capture\CaptureManager.cpp" />
     <ClCompile Include="legacy\LegacyCapability.cpp" />
@@ -150,6 +147,7 @@ exit /B 0
   </ItemGroup>
   <ItemGroup>
     <QtUic Include="ui\MainWindow.ui" />
+    <QtRcc Include="resources\app.qrc" />
     <QtMoc Include="src\MainWindow.h" />
     <QtMoc Include="core\ICommSession.h" />
     <QtMoc Include="core\ITransport.h" />
@@ -160,6 +158,7 @@ exit /B 0
     <QtMoc Include="transport\UdpTransport.h" />
     <QtMoc Include="session\NativeSession.h" />
     <QtMoc Include="services\SendScheduler.h" />
+    <ClInclude Include="services\WaveformGenerator.h" />
     <QtMoc Include="capture\CaptureWriter.h" />
     <QtMoc Include="capture\CaptureManager.h" />
     <QtMoc Include="legacy\ILegacyBackend.h" />

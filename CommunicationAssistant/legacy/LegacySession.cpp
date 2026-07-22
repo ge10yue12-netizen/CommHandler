@@ -34,6 +34,7 @@ QString legacyControlMsgName(int msg)
     case W_CUSTOM_COMM_CALC_LVE_LENGTH: return QStringLiteral("识别线条标距");
     case W_CUSTOM_COMM_DATASTREAMING: return QStringLiteral("数据流控制");
     case W_CUSTOM_COMM_DATAPOLLING: return QStringLiteral("轮询请求");
+    case W_CUSTOM_COMM_PROTO_ACK: return QStringLiteral("协议应答");
     case W_CUSTOM_COMM_UPDATEPULSECTRL: return QStringLiteral("刷新脉冲");
     case W_CUSTOM_COMM_PULSECALIDONE: return QStringLiteral("脉冲标定完成");
     case W_CUSTOM_COMM_PULSEBUTTON: return QStringLiteral("刷新脉冲按钮");
@@ -446,6 +447,19 @@ void LegacySession::onParameterEvent(int ctrlCmd, int viewId, int msg, const QVa
                       .arg(ctrlCmd)
                       .arg(viewId)
                       .arg(msg);
+    // 协议自动 ACK：把 code / 线发 JSON 写入摘要，避免助手侧「有回包但无反馈」
+    if (extra.contains(QStringLiteral("wireTx"))) {
+        const int ackCode = extra.value(QStringLiteral("ackCode")).toInt();
+        const QString wire = extra.value(QStringLiteral("wireTx")).toString();
+        const QString ackMsg = extra.value(QStringLiteral("ackMessage")).toString();
+        rec.summary += QStringLiteral(" | 自动应答 code=%1").arg(ackCode);
+        if (!ackMsg.isEmpty())
+            rec.summary += QStringLiteral(" msg=%1").arg(ackMsg);
+        if (!wire.isEmpty())
+            rec.summary += QStringLiteral(" | %1").arg(wire);
+        rec.bytes = wire.toUtf8();
+        rec.direction = Direction::Tx;
+    }
     emit recordReceived(rec);
 }
 

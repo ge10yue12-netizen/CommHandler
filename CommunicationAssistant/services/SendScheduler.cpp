@@ -50,10 +50,14 @@ Result SendScheduler::startTask(const ScheduleTaskSpec& spec)
 {
     if (!session_)
         return Result::fail(QStringLiteral("no_session"), QStringLiteral("未绑定会话"));
-    if (spec.payloads.isEmpty())
+    if (spec.mode != ScheduleMode::Waveform && spec.payloads.isEmpty())
         return Result::fail(QStringLiteral("invalid_payloads"), QStringLiteral("载荷列表为空"));
+    if (spec.mode == ScheduleMode::Waveform && spec.waveform.channels < 1)
+        return Result::fail(QStringLiteral("invalid_waveform"), QStringLiteral("波形通道数须≥1"));
     if (spec.mode != ScheduleMode::Once && spec.intervalMs < 0)
         return Result::fail(QStringLiteral("invalid_interval"), QStringLiteral("间隔非法"));
+    if (spec.mode == ScheduleMode::Waveform && spec.intervalMs <= 0)
+        return Result::fail(QStringLiteral("invalid_interval"), QStringLiteral("波形间隔须大于 0"));
     if (spec.mode == ScheduleMode::Counted && spec.maxCount <= 0)
         return Result::fail(QStringLiteral("invalid_count"), QStringLiteral("指定次数须大于 0"));
     if (spec.mode == ScheduleMode::RoundRobin && spec.payloads.size() < 1)
@@ -71,6 +75,8 @@ Result SendScheduler::startTask(const ScheduleTaskSpec& spec)
     TaskRuntime runtime;
     runtime.spec = normalized;
     runtime.phase = Phase::Idle;
+    if (normalized.mode == ScheduleMode::Waveform)
+        runtime.waveGen.reset(normalized.waveform);
     runtime.timer = new QTimer(this);
     runtime.timer->setSingleShot(true);
     const QUuid taskId = normalized.taskId;
@@ -146,6 +152,33 @@ QByteArray SendScheduler::currentPayload(const TaskRuntime& task) const
     return task.spec.payloads.first();
 }
 
+bool SendScheduler::fillWaveformRequest(TaskRuntime* task, SendRequest* req) const
+{
+    if (!task || !req)
+        return false;
+    const double tSec =
+        (static_cast<double>(task->completedSends) * static_cast<double>(task->spec.intervalMs))
+        / 1000.0;
+    const QVector<double> values = task->waveGen.sample(tSec);
+    const QString csv = WaveformGenerator::toCsv(values);
+    req->attributes = task->spec.attributesTemplate;
+    const QString legacyMode = req->attributes.value(QStringLiteral("legacySend")).toString();
+    if (legacyMode == QStringLiteral("values")
+        || req->attributes.value(QStringLiteral("format")).toString() == QStringLiteral("values")) {
+        QVariantList list;
+        for (double v : values)
+            list << v;
+        req->attributes.insert(QStringLiteral("values"), list);
+        req->attributes.insert(QStringLiteral("legacySend"), QStringLiteral("values"));
+        req->payload = csv.toUtf8();
+    } else if (task->spec.nativeHexEncode) {
+        req->payload = WaveformGenerator::toNativeBytes(values, true);
+    } else {
+        req->payload = WaveformGenerator::toNativeBytes(values, false);
+    }
+    return true;
+}
+
 bool SendScheduler::shouldContinueAfterSubmitted(const TaskRuntime& task) const
 {
     switch (task.spec.mode) {
@@ -156,6 +189,10 @@ bool SendScheduler::shouldContinueAfterSubmitted(const TaskRuntime& task) const
     case ScheduleMode::Infinite:
         return true;
     case ScheduleMode::RoundRobin:
+        if (task.spec.maxCount > 0)
+            return task.completedSends < task.spec.maxCount;
+        return true;
+    case ScheduleMode::Waveform:
         if (task.spec.maxCount > 0)
             return task.completedSends < task.spec.maxCount;
         return true;
@@ -176,10 +213,19 @@ void SendScheduler::fireNextSend(TaskRuntime* task)
     req.sessionId = session_->sessionId();
     req.channelId = task->spec.channelId;
     req.broadcast = task->spec.broadcast;
-    req.payload = currentPayload(*task);
-    if (task->spec.payloadAttributes.size() == task->spec.payloads.size()
-        && task->payloadIndex >= 0 && task->payloadIndex < task->spec.payloadAttributes.size()) {
-        req.attributes = task->spec.payloadAttributes.at(task->payloadIndex);
+
+    if (task->spec.mode == ScheduleMode::Waveform) {
+        if (!fillWaveformRequest(task, &req)) {
+            finishTask(task->spec.taskId, QStringLiteral("waveform_failed"), true,
+                       QStringLiteral("waveform_sample"), QStringLiteral("波形采样失败"));
+            return;
+        }
+    } else {
+        req.payload = currentPayload(*task);
+        if (task->spec.payloadAttributes.size() == task->spec.payloads.size()
+            && task->payloadIndex >= 0 && task->payloadIndex < task->spec.payloadAttributes.size()) {
+            req.attributes = task->spec.payloadAttributes.at(task->payloadIndex);
+        }
     }
 
     task->pendingRequestId = req.requestId;
@@ -201,7 +247,8 @@ void SendScheduler::scheduleInterval(TaskRuntime* task)
     task->phase = Phase::WaitingInterval;
     int ms = qMax(0, task->spec.intervalMs);
     // payloadIndex 已指向下一条；间隔取「刚发完」那一行
-    if (task->spec.payloadIntervals.size() == task->spec.payloads.size()
+    if (task->spec.mode != ScheduleMode::Waveform
+        && task->spec.payloadIntervals.size() == task->spec.payloads.size()
         && !task->spec.payloads.isEmpty()) {
         int prev = task->payloadIndex - 1;
         if (task->spec.mode == ScheduleMode::RoundRobin) {

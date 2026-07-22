@@ -434,6 +434,8 @@ void SocketComm::initParameters()
 	setters["bAllOpenCamera"] = [this](const Any& value) { m_socketInfo.bAllOpenCamera = value.any_cast<bool>(); };
 	setters["bConntction"] = [this](const Any& value) { m_socketInfo.bConntction = value.any_cast<bool>(); };
 	setters["bInquireSendFlag"] = [this](const Any& value) { m_socketInfo.bInquireSendFlag = value.any_cast<bool>(); };
+	// 助手观测开关：默认 false，正式软件不设则零语义变化
+	setters["bAssistObserve"] = [this](const Any& value) { m_bAssistObserve = value.any_cast<bool>(); };
 	setters["input"] = [this](const Any& value) { m_socketInfo.input = value.any_cast<DataInput>(); };
 	setters["output"] = [this](const Any& value) { m_socketInfo.output = value.any_cast<DataOutput>(); };
 
@@ -464,6 +466,7 @@ void SocketComm::initParameters()
 	getters["bAllOpenCamera"] = [this]() -> Any { return m_socketInfo.bAllOpenCamera; };
 	getters["bConntction"] = [this]() -> Any { return m_socketInfo.bConntction; };
 	getters["bInquireSendFlag"] = [this]() -> Any { return m_socketInfo.bInquireSendFlag; };
+	getters["bAssistObserve"] = [this]() -> Any { return m_bAssistObserve; };
 	getters["input"] = [this]() -> Any { return m_socketInfo.input; };
 	getters["output"] = [this]() -> Any { return m_socketInfo.output; };
 }
@@ -493,6 +496,7 @@ void SocketComm::initInfo()
 	m_socketInfo.bAllOpenCamera = false;
 	m_socketInfo.bConntction = false;
 	m_socketInfo.bInquireSendFlag = false;
+	m_bAssistObserve = false;
 
 	m_socketInfo.input.iChannelState = 0;
 	m_socketInfo.input.iChannelSize = 1;
@@ -700,7 +704,7 @@ void SocketComm::onRecvDataSlots(QByteArray data)
 		}
 		else if (!data.isEmpty())
 		{
-			emit emitUnparsedRx(data);
+			emitAssistUnparsedRx(data);
 		}
 		break;
 	}
@@ -718,7 +722,7 @@ void SocketComm::onRecvDataSlots(QByteArray data)
 		}
 		else if (!data.isEmpty())
 		{
-			emit emitUnparsedRx(data);
+			emitAssistUnparsedRx(data);
 		}
 		break;
 	}
@@ -740,7 +744,7 @@ void SocketComm::onRecvDataSlots(QByteArray data)
 	}
 	default:
 		if (!data.isEmpty())
-			emit emitUnparsedRx(data);
+			emitAssistUnparsedRx(data);
 		break;
 	}
 }
@@ -757,7 +761,7 @@ void SocketComm::processLhgkRxStream(const QByteArray& chunk)
 	constexpr int kMaxLhgkRxBytes = 64 * 1024;
 	m_lhgkRxBuffer.append(chunk);
 	if (m_lhgkRxBuffer.size() > kMaxLhgkRxBytes) {
-		emit emitUnparsedRx(m_lhgkRxBuffer.left(4096));
+		emitAssistUnparsedRx(m_lhgkRxBuffer.left(4096));
 		m_lhgkRxBuffer.clear();
 		return;
 	}
@@ -767,16 +771,16 @@ void SocketComm::processLhgkRxStream(const QByteArray& chunk)
 		if (sync < 0) {
 			if (m_lhgkRxBuffer.endsWith(char(0xAA))) {
 				if (m_lhgkRxBuffer.size() > 1)
-					emit emitUnparsedRx(m_lhgkRxBuffer.left(m_lhgkRxBuffer.size() - 1));
+					emitAssistUnparsedRx(m_lhgkRxBuffer.left(m_lhgkRxBuffer.size() - 1));
 				m_lhgkRxBuffer = QByteArray(1, char(0xAA));
 			} else {
-				emit emitUnparsedRx(m_lhgkRxBuffer);
+				emitAssistUnparsedRx(m_lhgkRxBuffer);
 				m_lhgkRxBuffer.clear();
 			}
 			break;
 		}
 		if (sync > 0) {
-			emit emitUnparsedRx(m_lhgkRxBuffer.left(sync));
+			emitAssistUnparsedRx(m_lhgkRxBuffer.left(sync));
 			m_lhgkRxBuffer.remove(0, sync);
 		}
 
@@ -785,7 +789,7 @@ void SocketComm::processLhgkRxStream(const QByteArray& chunk)
 		if (need == 0)
 			break;
 		if (need < 0) {
-			emit emitUnparsedRx(m_lhgkRxBuffer.left(1));
+			emitAssistUnparsedRx(m_lhgkRxBuffer.left(1));
 			m_lhgkRxBuffer.remove(0, 1);
 			continue;
 		}
@@ -794,7 +798,7 @@ void SocketComm::processLhgkRxStream(const QByteArray& chunk)
 		m_lhgkRxBuffer.remove(0, need);
 		std::vector<uint8_t> frameVec(frame.begin(), frame.end());
 		if (!handleFrame(frameVec))
-			emit emitUnparsedRx(frame);
+			emitAssistUnparsedRx(frame);
 	}
 }
 
@@ -955,7 +959,7 @@ void SocketComm::ParsingProtocolI(const QByteArray& message)
 	if (!msg.isObject())
 	{
 		if (!message.isEmpty())
-			emit emitUnparsedRx(message);
+			emitAssistUnparsedRx(message);
 		return;
 	}
 
@@ -990,6 +994,7 @@ void SocketComm::ParsingProtocolI(const QByteArray& message)
 						QJsonDocument doc(json);
 						QString jsonString = doc.toJson(QJsonDocument::Compact);
 						m_controlBox.sendData(jsonString);
+						notifyWireTxAck(70, QStringLiteral("The camera is not turned on."), 1, jsonString);
 						return;
 					}
 
@@ -1012,6 +1017,7 @@ void SocketComm::ParsingProtocolI(const QByteArray& message)
 							QJsonDocument doc(json);
 							QString jsonString = doc.toJson(QJsonDocument::Compact);
 							m_controlBox.sendData(jsonString);
+							notifyWireTxAck(100, QStringLiteral("Gauge length does not exists."), 1, jsonString);
 						}
 
 						if (m_socketInfo.input.iTriggerCtrl)
@@ -1044,6 +1050,7 @@ void SocketComm::ParsingProtocolI(const QByteArray& message)
 						QJsonDocument doc(json);
 						QString jsonString = doc.toJson(QJsonDocument::Compact);
 						m_controlBox.sendData(jsonString);
+						notifyWireTxAck(0, QString(), 1, jsonString);
 					}
 					// 已经在计算了
 					else if (m_socketInfo.bOnlineCollect)
@@ -1073,6 +1080,7 @@ void SocketComm::ParsingProtocolI(const QByteArray& message)
 						QJsonDocument doc(json);
 						QString jsonString = doc.toJson(QJsonDocument::Compact);
 						m_controlBox.sendData(jsonString);
+						notifyWireTxAck(170, QStringLiteral("Computation is already running."), 1, jsonString);
 					}
 				}
 				break;
@@ -1105,6 +1113,7 @@ void SocketComm::ParsingProtocolI(const QByteArray& message)
 				{
 					if (!m_socketInfo.bOnlineCollect)
 					{
+						emitAssistUnparsedRx(message);
 						return;
 					}
 					m_socketInfo.output.iTransferType = 1;
@@ -1117,6 +1126,7 @@ void SocketComm::ParsingProtocolI(const QByteArray& message)
 				{
 					if (!m_socketInfo.bOnlineCollect)
 					{
+						emitAssistUnparsedRx(message);
 						return;
 					}
 					// 发送数据
@@ -1146,6 +1156,29 @@ void SocketComm::SendReturnMsg(const int& code, const QString& msg, const int& t
 	QJsonDocument doc(json);
 	QString jsonString = doc.toJson(QJsonDocument::Compact);
 	m_controlBox.sendData(jsonString);
+	notifyWireTxAck(code, (msg == QStringLiteral("null")) ? QString() : msg, tn, jsonString);
+}
+
+// 助手观测：上报协议线发 ACK
+void SocketComm::notifyWireTxAck(int code, const QString& message, int tn, const QString& wireJson)
+{
+	if (!m_bAssistObserve)
+		return;
+	QVariantMap extra;
+	extra.insert(QStringLiteral("ackCode"), code);
+	extra.insert(QStringLiteral("ackMessage"), message);
+	extra.insert(QStringLiteral("tn"), tn);
+	extra.insert(QStringLiteral("wireTx"), wireJson);
+	extra.insert(QStringLiteral("wireDirection"), QStringLiteral("tx"));
+	emit emitEventMsgAndData(CommCtrlCmd::ControlSoftStatus, CommViewID::Socket_ID, W_CUSTOM_COMM_PROTO_ACK, extra);
+}
+
+// 助手观测：未识别载荷上报
+void SocketComm::emitAssistUnparsedRx(const QByteArray& raw)
+{
+	if (!m_bAssistObserve || raw.isEmpty())
+		return;
+	emit emitUnparsedRx(raw);
 }
 
 void SocketComm::ParsingProtocolII(const QByteArray& data)
@@ -1172,7 +1205,7 @@ void SocketComm::ParsingProtocolII(const QByteArray& data)
 		}
 	}
 	if (!matched && !data.isEmpty())
-		emit emitUnparsedRx(data);
+		emitAssistUnparsedRx(data);
 }
 
 void SocketComm::ParsingProtocolZhongji(const QByteArray& message)
@@ -1225,7 +1258,7 @@ void SocketComm::ParsingProtocolZhongji(const QByteArray& message)
 	}
 	// 长度与中机结构均不匹配：上报未解析线帧，避免助手侧以为「对端未发」
 	if (!message.isEmpty())
-		emit emitUnparsedRx(message);
+		emitAssistUnparsedRx(message);
 }
 
 void SocketComm::AnalysisZhongjiControl(const SocketProtol::ControlMessage& message)
@@ -1325,7 +1358,7 @@ void SocketComm::ParsingProtocolSansi(const QByteArray& data)
 		return;
 	}
 	if (!data.isEmpty())
-		emit emitUnparsedRx(data);
+		emitAssistUnparsedRx(data);
 }
 
 bool SocketComm::parseFuJianWeishengData(const QString& message, TestData& data)
@@ -1382,7 +1415,12 @@ void SocketComm::paeseNaBaiChuanData(const QByteArray& message)
 			if (name == "alphaStartTest")
 			{
 				handled = true;
-				// 已在采集态仍上报开始事件，避免「再发一次无日志」被误判为阻塞
+				// 已在采集：正式语义直接返回；助手观测时仅上报未解析
+				if (m_socketInfo.bOnlineCollect)
+				{
+					emitAssistUnparsedRx(body);
+					return;
+				}
 				m_socketInfo.bOnlineCollect = true;
 				m_socketInfo.output.iTransferType = 0;
 				m_socketInfo.bInquireSendFlag = true;
@@ -1394,11 +1432,15 @@ void SocketComm::paeseNaBaiChuanData(const QByteArray& message)
 			else if (name == "alphaStopTest")
 			{
 				handled = true;
+				// 仅采集中清标志并上报 STOP
 				if (m_socketInfo.bOnlineCollect)
-					m_socketInfo.bOnlineCollect = false;
-				if (m_socketInfo.input.iTriggerCtrl)
 				{
+					m_socketInfo.bOnlineCollect = false;
 					emit emitEventMsg(CommCtrlCmd::ControlSoftStatus, CommViewID::UNKNOWN_VIEW_ID, W_CUSTOM_COMM_STOPCALC);
+				}
+				else
+				{
+					emitAssistUnparsedRx(body);
 				}
 			}
 			else if (name == "alphaSetLD")
@@ -1449,7 +1491,7 @@ void SocketComm::paeseNaBaiChuanData(const QByteArray& message)
 
 	// 未识别载荷必须可观测，禁止静默丢弃（含非 JSON / 缺字段）
 	if (!handled && !body.isEmpty())
-		emit emitUnparsedRx(body);
+		emitAssistUnparsedRx(body);
 }
 
 void SocketComm::paeseNaBaiChuanDataCalcLine(const QByteArray& message)
@@ -1461,7 +1503,12 @@ void SocketComm::paeseNaBaiChuanDataCalcLine(const QByteArray& message)
 
 	if (body == "calcStart")
 	{
-		// 重复开始：保持采集态并再次上报，避免二次投递无反馈被当成卡死
+		// 已在采集：正式语义直接返回；助手观测时仅上报未解析
+		if (m_socketInfo.bOnlineCollect)
+		{
+			emitAssistUnparsedRx(body);
+			return;
+		}
 		m_socketInfo.bOnlineCollect = true;
 		m_socketInfo.output.iTransferType = 0;
 		m_socketInfo.bInquireSendFlag = true;
@@ -1472,9 +1519,16 @@ void SocketComm::paeseNaBaiChuanDataCalcLine(const QByteArray& message)
 	}
 	else if (body == "calcEnd")
 	{
+		// 仅采集中清标志并上报 STOP
 		if (m_socketInfo.bOnlineCollect)
+		{
 			m_socketInfo.bOnlineCollect = false;
-		emit emitEventMsg(CommCtrlCmd::ControlSoftStatus, CommViewID::UNKNOWN_VIEW_ID, W_CUSTOM_COMM_STOPCALC);
+			emit emitEventMsg(CommCtrlCmd::ControlSoftStatus, CommViewID::UNKNOWN_VIEW_ID, W_CUSTOM_COMM_STOPCALC);
+		}
+		else
+		{
+			emitAssistUnparsedRx(body);
+		}
 	}
 	else
 	{
@@ -1521,6 +1575,6 @@ void SocketComm::paeseNaBaiChuanDataCalcLine(const QByteArray& message)
 		}
 
 		if (!handled)
-			emit emitUnparsedRx(body);
+			emitAssistUnparsedRx(body);
 	}
 }

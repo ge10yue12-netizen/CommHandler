@@ -1,0 +1,6 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/ca/icons">
+    <file alias="combo_down.png">combo_down.png</file>
+  </qresource>
+</RCC>

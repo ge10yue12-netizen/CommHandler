@@ -32,7 +32,7 @@
 | `CommunicationAssistant/transport/` | 原生传输：Serial / TcpClient / TcpServer / Udp |
 | `CommunicationAssistant/session/` | `NativeSession` |
 | `CommunicationAssistant/legacy/` | `LegacySession`、能力表、Worker、后端抽象 |
-| `CommunicationAssistant/services/` | 发送调度 |
+| `CommunicationAssistant/services/` | 发送调度、波形发生器 |
 | `CommunicationAssistant/capture/` | JSONL 会话记录落盘 |
 | `CommHandler/` | 兼容动态库实现（协议与链路） |
 | `docs/` | 基线、审计规范、测试与开发文档 |
@@ -83,7 +83,18 @@
 
 界面「数据显示」中的发送记录对兼容通道标注**入参**；动态库接口不回传已发送原始线帧。
 
-### 4.3 兼容动态库接收
+### 4.3 波形发送（原生 + 兼容）
+
+```text
+WaveformGenerator(幅值/频率/初相/偏置/噪声/通道/种子)
+  → SendScheduler(Waveform)
+  → Native：CSV 或 HEX 字节写出
+  → Legacy：每拍 values 入参 → DLL 组帧（仅能力允许发数值时）
+```
+
+不能发数值的协议：启动波形时边界拒绝，能力区标明「不能发」原因。不做试验机模拟。
+
+### 4.4 兼容动态库接收
 
 ```text
 链路字节

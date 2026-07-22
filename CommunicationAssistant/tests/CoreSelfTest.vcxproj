@@ -55,7 +55,7 @@
     <PostBuildEvent>
       <Command>if exist "$(ProjectDir)..\runtime\*" copy /Y "$(ProjectDir)..\runtime\*" "$(OutDir)" &gt;nul 2&gt;&amp;1
 if exist "$(ProjectDir)..\..\CommHandler\x64\Release\CommHandler.dll" copy /Y "$(ProjectDir)..\..\CommHandler\x64\Release\CommHandler.dll" "$(OutDir)" &gt;nul 2&gt;&amp;1
-if exist "$(ProjectDir)..\..\CommHandler\x64\Release\CommHandler.pdb" copy /Y "$(ProjectDir)..\..\CommHandler\x64\Release\CommHandler.pdb" "$(OutDir)" &gt;nul 2&gt;&amp;1
+if exist "$(ProjectDir)..\..\QtExeTool.bat" call "$(ProjectDir)..\..\QtExeTool.bat" "$(OutDir)CoreSelfTest.exe" fix nopause
 exit /B 0
 </Command>
     </PostBuildEvent>
@@ -68,6 +68,7 @@ exit /B 0
     <ClCompile Include="..\transport\UdpTransport.cpp" />
     <ClCompile Include="..\session\NativeSession.cpp" />
     <ClCompile Include="..\services\SendScheduler.cpp" />
+    <ClCompile Include="..\services\WaveformGenerator.cpp" />
     <ClCompile Include="..\capture\CaptureWriter.cpp" />
     <ClCompile Include="..\capture\CaptureManager.cpp" />
     <ClCompile Include="..\legacy\LegacyCapability.cpp" />

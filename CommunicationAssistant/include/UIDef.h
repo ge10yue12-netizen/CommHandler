@@ -286,3 +286,4 @@ struct PulseInfo {
 #define     W_CUSTOM_COMM_CALC_LVE_LENGTH                           W_CUSTOM + 11   // 识别线条标距 
 #define     W_CUSTOM_ZERO_CLEARING									W_CUSTOM + 12   // 清零，清楚所有数据
 #define     W_CUSTOM_COMM_AUTO_SAVE_IMAGE                           W_CUSTOM + 13   // 通讯自动存图
+#define     W_CUSTOM_COMM_PROTO_ACK                                 W_CUSTOM + 14   // 协议线发 ACK 观测（仅 bAssistObserve=true 时上报）

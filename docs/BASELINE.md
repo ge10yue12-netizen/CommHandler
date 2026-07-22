@@ -860,10 +860,11 @@ M1 验收：
 - `activeLegacySessionId` 单会话；Legacy 事件写入 Capture；
 - Worker 外 Watchdog；Unresponsive 提示。
 
-### M3：试验机与波形
+### M3：波形发送（试验机角色不做）
 
-- SimulatorSession + DeviceSimulator；
-- ResponseRule；波形 → Scheduler → Native 或受支持的 Legacy 数值路径。
+- `WaveformGenerator` + `SendScheduler::Waveform`；
+- 波形 → Scheduler → Native 或受支持的 Legacy 数值路径；
+- **不做** SimulatorSession / DeviceSimulator / 试验机应答模拟（助手仅作助手）。
 
 ### M4：按需 Codec 与回放
 

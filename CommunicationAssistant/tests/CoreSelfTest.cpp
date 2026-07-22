@@ -11,6 +11,7 @@
 #include "LegacyWatchdog.h"
 #include "SendScheduler.h"
 #include "Types.h"
+#include "WaveformGenerator.h"
 
 #include <QCoreApplication>
 #include <QDateTime>
@@ -25,6 +26,7 @@
 #include <QTcpSocket>
 #include <QTimer>
 #include <QVector>
+#include <cmath>
 #include <cstdio>
 
 static int g_failed = 0;
@@ -706,6 +708,39 @@ static void testSchedulerOnceAndCounted()
            "sched counted three submits");
 }
 
+static void testWaveformGeneratorAndSched()
+{
+    ca::WaveformGenerator gen;
+    ca::WaveformGenerator::Config cfg;
+    cfg.amplitude = 10.0;
+    cfg.frequencyHz = 1.0;
+    cfg.phaseRad = 0.0;
+    cfg.offset = 0.0;
+    cfg.noiseStd = 0.0;
+    cfg.channels = 2;
+    cfg.seed = 42;
+    gen.reset(cfg);
+    const QVector<double> v0 = gen.sample(0.0);
+    expect(v0.size() == 2, "wave sample channels");
+    expect(std::fabs(v0.at(0) - 0.0) < 1e-6, "wave ch0 at t0 ~ offset");
+    const QString csv = ca::WaveformGenerator::toCsv(v0);
+    expect(csv.contains(QLatin1Char(',')), "wave csv has comma");
+
+    FakeSession session;
+    expect(session.open().ok, "wave sched open");
+    ca::SendScheduler sched;
+    sched.setSession(&session);
+    ca::ScheduleTaskSpec wave;
+    wave.mode = ca::ScheduleMode::Waveform;
+    wave.intervalMs = 20;
+    wave.maxCount = 3;
+    wave.waveform = cfg;
+    expect(sched.startTask(wave).ok, "wave sched start");
+    expect(waitUntil([&]() { return sched.activeTaskCount() == 0 && session.sendCount_ == 3; }, 3000),
+           "wave sched three samples");
+    expect(!session.lastPayloads_.isEmpty(), "wave payloads recorded");
+}
+
 static void testSchedulerRoundRobinAndPause()
 {
     FakeSession session;
@@ -1318,6 +1353,7 @@ int main(int argc, char* argv[])
     testUdpBindConflictAndTcpCoexist();
     testUdpSendWithoutRemote();
     testSchedulerOnceAndCounted();
+    testWaveformGeneratorAndSched();
     testSchedulerRoundRobinAndPause();
     testSchedulerFailedStopsAndSubmittedAnchor();
     testCaptureJsonRoundtripAndHeader();

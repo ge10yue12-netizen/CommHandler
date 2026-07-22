@@ -5,11 +5,14 @@
 #include "NativeSession.h"
 #include "SendScheduler.h"
 #include "SessionManager.h"
+#include "WaveformGenerator.h"
 
 #include "ui_MainWindow.h"
 
+#include <QAbstractSpinBox>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMainWindow>
@@ -26,7 +29,7 @@
 #include "Result.h"
 
 /**
- * @brief 调试助手主窗：侧栏连接；主区数据/日志；底部发送工作台（单条+列表）。
+ * @brief 调试助手主窗：侧栏连接；主区数据/日志；底部发送工作台（单条+列表+波形）。
  * @thread UI 线程。
  */
 class MainWindow : public QMainWindow
@@ -46,6 +49,7 @@ private slots:
     void onOpenClicked();
     void onCloseClicked();
     void onSendClicked();
+    void onClearDataClicked();
     void onClearLogClicked();
     void onRecordReceived(const ca::CommRecord& record);
     void onSessionStateChanged(ca::SessionState state);
@@ -53,6 +57,7 @@ private slots:
     void onChannelsChanged();
     void onDisconnectClientClicked();
     void onSchedStartClicked();
+    void onWaveSchedStartClicked();
     void onSchedPauseClicked();
     void onSchedResumeClicked();
     void onSchedStopClicked();
@@ -61,13 +66,13 @@ private slots:
     void onCaptureFailed(const QUuid& sessionId, const QString& code, const QString& message);
     void onCaptureStarted(const QUuid& sessionId, const QString& filePath);
     void onLegacyUnresponsive(const QString& message);
-    // 发送列表：增删、导入导出、发送选中行
+    // 发送列表：增删清空、导入导出、右键菜单
     void onSendListAddRow();
     void onSendListRemoveRows();
+    void onSendListClearAll();
     void onSendListImport();
     void onSendListExport();
-    void onSendListSendSelected();
-
+    void onSendListContextMenu(const QPoint& pos);
 private:
     // 列表行「格式」列取值
     enum SendPayloadFormat {
@@ -84,6 +89,10 @@ private:
     void bindUiWidgets();
     // 填充组合框、默认值与表格头等运行时内容
     void populateDynamicUi();
+    // 动态创建「波形发送」页（不依赖 Designer 手改易碎布局）
+    void buildWaveformTab();
+    // 原生接收/发送辅助选项（HEX+ASCII、发送后清空）
+    void buildNativeAssistOptions();
     void appendLog(const QString& line, const QString& cssClass = QString());
     void appendData(const QString& line);
     void syncUi();
@@ -91,6 +100,8 @@ private:
     void refreshClientCombo();
     void refreshLegacyCapabilityTips();
     void updateSendPlaceholders();
+    // 按调度模式显隐间隔/次数控件
+    void updateSchedControlsVisibility();
     // 十六进制发送勾选优先：禁用以太网 Legacy 模式下拉，避免双源冲突
     void updateSendFormatMutex();
     // 原生通道：勾选/取消「十六进制发送」时，单条编辑框文本⇄HEX 互转（仅 UI，不改传输模块）
@@ -102,10 +113,16 @@ private:
     bool isLegacyMode() const;
     // 仅接收展示：勾选则 RX 字节以 HEX 显示，否则原样文本（不影响发送）
     bool preferHexDisplay() const;
+    // 接收展示附加可读 ASCII（常见调试助手双栏风格）
+    bool preferHexAsciiDisplay() const;
     // 仅发送：勾选则按 HEX 解析发出，且 TX 记录按 HEX 展示（不影响接收）
     bool preferHexSend() const;
+    // 单条发送成功后是否清空编辑框
+    bool clearAfterSend() const;
     // 当前 Legacy 协议显示名（如「串口 0 三思」）
     QString currentLegacyProtocolLabel() const;
+    // 按当前协议推荐波形通道数
+    int recommendedWaveChannels() const;
     ca::ICommSession* activeSession();
     const ca::ICommSession* activeSession() const;
     ca::SessionConfig buildConfig() const;
@@ -118,18 +135,21 @@ private:
     ca::Result buildLegacySendRequest(ca::SendRequest* req, QString* error) const;
     QString formatRecordForDisplay(const ca::CommRecord& record) const;
     static QString sessionStateTip(ca::SessionState state);
+    static QString bytesAsPrintableAscii(const QByteArray& bytes);
 
-    // 发送列表表格读写
+    // 发送列表表格读写（间隔统一使用下方默认间隔）
     void ensureSendListHeaders();
-    void addSendListRow(bool enabled, const QString& name, const QString& payload, int intervalMs,
-                        int format);
+    void addSendListRow(bool enabled, const QString& name, const QString& payload, int format);
     bool collectEnabledListPayloads(QVector<QByteArray>* outPayloads, QVector<int>* outFormats,
                                     QString* error) const;
     bool importSendListFile(const QString& path, QString* error);
     bool exportSendListFile(const QString& path, QString* error) const;
     static QString formatName(int format);
     static int formatFromName(const QString& name);
-
+    // 行是否勾选启用
+    bool isSendListRowEnabled(int row) const;
+    // 收集勾选行索引（升序）
+    QList<int> enabledSendListRows() const;
     ca::SessionManager manager_;
     ca::NativeSession session_;
     ca::LegacySession legacySession_;
@@ -186,8 +206,11 @@ private:
     QLabel* statusLabel_ = nullptr;
 
     QCheckBox* hexDisplayCheck_ = nullptr;
+    QCheckBox* hexAsciiCheck_ = nullptr;
+    QCheckBox* clearAfterSendCheck_ = nullptr;
     QCheckBox* captureEnableCheck_ = nullptr;
-    QPushButton* btnClear_ = nullptr;
+    QPushButton* btnClearData_ = nullptr;
+    QPushButton* btnClearLog_ = nullptr;
 
     // 发送工作台
     QTabWidget* sendTabs_ = nullptr;
@@ -199,9 +222,9 @@ private:
     QTableWidget* sendListTable_ = nullptr;
     QPushButton* btnListAdd_ = nullptr;
     QPushButton* btnListRemove_ = nullptr;
+    QPushButton* btnListClearAll_ = nullptr;
     QPushButton* btnListImport_ = nullptr;
     QPushButton* btnListExport_ = nullptr;
-    QPushButton* btnListSendSelected_ = nullptr;
 
     QComboBox* schedModeCombo_ = nullptr;
     QSpinBox* schedIntervalSpin_ = nullptr;
@@ -210,6 +233,26 @@ private:
     QPushButton* btnSchedPause_ = nullptr;
     QPushButton* btnSchedResume_ = nullptr;
     QPushButton* btnSchedStop_ = nullptr;
+
+    // 波形页
+    QDoubleSpinBox* waveAmpSpin_ = nullptr;
+    QDoubleSpinBox* waveFreqSpin_ = nullptr;
+    QDoubleSpinBox* wavePhaseSpin_ = nullptr;
+    QDoubleSpinBox* waveOffsetSpin_ = nullptr;
+    QDoubleSpinBox* waveNoiseSpin_ = nullptr;
+    QSpinBox* waveChannelsSpin_ = nullptr;
+    QSpinBox* waveSeedSpin_ = nullptr;
+    QSpinBox* waveIntervalSpin_ = nullptr;
+    QSpinBox* waveCountSpin_ = nullptr;
+    QCheckBox* waveNativeHexCheck_ = nullptr;
+    QCheckBox* waveInfiniteCheck_ = nullptr;
+    QPushButton* btnWaveStart_ = nullptr;
+    QPushButton* btnWavePause_ = nullptr;
+    QPushButton* btnWaveResume_ = nullptr;
+    QPushButton* btnWaveStop_ = nullptr;
+    QLabel* waveHintLabel_ = nullptr;
+    // 去掉数值框上下加减箭头
+    static void polishPlainSpin(QAbstractSpinBox* box);
 
     QPlainTextEdit* dataView_ = nullptr;
     QPlainTextEdit* log_ = nullptr;

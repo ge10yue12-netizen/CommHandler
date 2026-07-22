@@ -41,7 +41,8 @@ btnOpen
 statusLabel
 hexDisplayCheck
 captureEnableCheck
-btnClear
+btnClearData
+btnClearLog
 sendTabs
 hexSendCheck
 legacySendModeCombo
@@ -50,9 +51,9 @@ btnSend
 sendListTable
 btnListAdd
 btnListRemove
+btnListClearAll
 btnListImport
 btnListExport
-btnListSendSelected
 schedModeCombo
 schedIntervalSpin
 schedCountSpin
@@ -66,9 +67,10 @@ txCountLabel
 rxCountLabel
 btnResetCount
 secConnect
+secConfig
 secReceive
 secSend
-secOther
+lblLegacyCap
 secWorkMode
 secConn
 sideScroll

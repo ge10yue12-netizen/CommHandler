@@ -148,8 +148,12 @@ private:
 
 	// 解析协议二  json
 	void ParsingProtocolI(const QByteArray&);
-	// 发送返回code
+	// 发送返回 code；助手观测开启时同步 PROTO_ACK
 	void SendReturnMsg(const int& code, const QString& msg, const int& tn);
+	// 助手观测：将已写出的 JSON ACK 同步为参数事件（默认关闭，不影响正式软件）
+	void notifyWireTxAck(int code, const QString& message, int tn, const QString& wireJson);
+	// 助手观测：未识别载荷上报（默认关闭）
+	void emitAssistUnparsedRx(const QByteArray& raw);
 
 	// 解析协议三消息   万测
 	void ParsingProtocolII(const QByteArray&);
@@ -176,6 +180,8 @@ private:
 private:
 	// 外部控制信息
 	SocketInfo m_socketInfo;
+	// 助手联调观测开关（不进 SocketInfo，避免破坏参数二进制布局）
+	bool m_bAssistObserve = false;
 
 	double m_dfreq;
 	NetLhgkProtocol lhgkProto_;
