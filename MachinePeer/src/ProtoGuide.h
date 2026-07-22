@@ -1,25 +1,27 @@
-// ProtoGuide.h — MachinePeer：协议与串口参数下拉填充
+// ProtoGuide.h — MachinePeer：协议与串口参数下拉填充（索引对齐 CommHandler）
 #pragma once
 
 #include <QComboBox>
 
 namespace ProtoGuide {
 
-// 网口协议列表；itemData 对齐库 iProtoType
+// 网口协议列表；itemData 对齐库 iProtoType（含联恒光科 8）
 inline void fillNetProto(QComboBox* net)
 {
     net->clear();
-    const char* np[] = {"0 JSON", "1 万测", "2 中机", "3 三思", "4 触发存图", "5 福建威盛", "6 纳百川", "7 纳百川线条"};
-    for (int i = 0; i < 8; ++i)
+    const char* np[] = {"0 JSON",         "1 万测",       "2 中机",     "3 三思",
+                        "4 触发存图",     "5 福建威盛",   "6 纳百川",   "7 纳百川线条",
+                        "8 联恒光科"};
+    for (int i = 0; i < 9; ++i)
         net->addItem(QString::fromUtf8(np[i]), i);
 }
 
-// 串口协议列表；itemData 对齐库 iProtocolType
+// 串口协议列表；itemData 对齐库 iProtocolType（含联恒光科 5）
 inline void fillSerialProto(QComboBox* ser)
 {
     ser->clear();
-    const char* sp[] = {"0 三思", "1 科新", "2 时代新材", "3 IEEE", "4 冠腾"};
-    for (int i = 0; i < 5; ++i)
+    const char* sp[] = {"0 三思", "1 科新", "2 时代新材", "3 IEEE", "4 冠腾", "5 联恒光科"};
+    for (int i = 0; i < 6; ++i)
         ser->addItem(QString::fromUtf8(sp[i]), i);
 }
 

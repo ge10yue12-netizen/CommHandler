@@ -229,7 +229,8 @@ void MainWindow::sendCmd(int cmd)
             return;
         }
         if (m_channels.sendNetwork(j, &fail)) {
-            if (proto() == 2)
+            // 中机 / 联恒为二进制线帧，其余按文本记录
+            if (proto() == 2 || proto() == 8)
                 log(QStringLiteral("TX  %1").arg(QString::fromLatin1(j.toHex().toUpper())));
             else
                 log(QStringLiteral("TX  %1").arg(QString::fromUtf8(j)));
@@ -373,7 +374,8 @@ void MainWindow::onSendMeasureClicked()
             return;
         }
         if (m_channels.sendNetwork(j, &fail)) {
-            if (proto() == 2 || proto() == 3)
+            // 中机 / 三思定长 / 联恒 RX 布局均为二进制
+            if (proto() == 2 || proto() == 3 || proto() == 8)
                 log(QStringLiteral("TX  %1").arg(QString::fromLatin1(j.toHex().toUpper())));
             else
                 log(QStringLiteral("TX  %1").arg(QString::fromUtf8(j)));
@@ -416,6 +418,11 @@ void MainWindow::onSerialBytesReceived(QByteArray chunk)
     } else if (proto() == 3) {
         m_serialRxBuf.append(chunk);
         const QList<QByteArray> frames = SerialProtocol::takeIeeeReplyFrames(&m_serialRxBuf);
+        for (const QByteArray& frame : frames)
+            handleSoftReply(frame);
+    } else if (proto() == 5) {
+        m_serialRxBuf.append(chunk);
+        const QList<QByteArray> frames = SerialProtocol::takeLhgkSerialReplyFrames(&m_serialRxBuf);
         for (const QByteArray& frame : frames)
             handleSoftReply(frame);
     } else {

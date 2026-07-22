@@ -1,6 +1,7 @@
 // NetworkProtocol.h — 试验机网口协议适配，严格对齐 SocketComm
 #pragma once
 
+#include "LhgkWire.h"
 #include "ProtocolResult.h"
 
 #include <QByteArray>
@@ -51,7 +52,7 @@ static_assert(sizeof(SansiMeasurement) == 24, "Unexpected SansiMeasurement layou
 // 判断动态库网口收路径是否支持指定控制指令
 inline bool canSendCommand(int proto, int command)
 {
-    if (proto == 0 || proto == 1 || proto == 2 || proto == 6 || proto == 7)
+    if (proto == 0 || proto == 1 || proto == 2 || proto == 6 || proto == 7 || proto == 8)
         return command == 0 || command == 1;
     return proto == 4 && command == 2;
 }
@@ -59,7 +60,7 @@ inline bool canSendCommand(int proto, int command)
 // 判断动态库网口收路径是否能产生测量数据信号
 inline bool canSendMeasurement(int proto)
 {
-    return proto == 2 || proto == 3 || proto == 5;
+    return proto == 2 || proto == 3 || proto == 5 || proto == 8;
 }
 
 // 返回动态库网口入站能力限制
@@ -71,17 +72,19 @@ inline QString unsupportedReason(int proto, bool command)
         if (proto == 5)
             return QStringLiteral("福建威盛库无控制指令");
         if (proto == 4)
-            return QStringLiteral("触发存图协议仅支持存图");
+            return QStringLiteral("触发存图协议仅支持存图（任意含 \\r\\n 载荷）");
+        if (proto == 1)
+            return QStringLiteral("万测控制字须与助手 cCMD 全等（默认 START/STOP）");
         return QStringLiteral("该网口协议不支持此指令");
     }
     if (proto == 0)
-        return QStringLiteral("JSON 库不解析业务测数");
+        return QStringLiteral("JSON 库不解析业务测数入站");
     if (proto == 1)
         return QStringLiteral("万测库仅解析控制文本");
     if (proto == 4)
         return QStringLiteral("触发存图协议无测数");
     if (proto == 6 || proto == 7)
-        return QStringLiteral("纳百川库无常规测数入站");
+        return QStringLiteral("纳百川库无常规测数入站（控制/标距事件）");
     return QStringLiteral("该网口协议无测数入站");
 }
 
@@ -118,7 +121,7 @@ inline bool write(QUdpSocket* socket, const QString& destIp, int destPort, const
 }
 
 // 按 SocketComm 控制分支组网口指令
-inline QByteArray packCommand(int proto, int command, QString* error)
+inline QByteArray packCommand(int proto, int command, QString* error = nullptr)
 {
     if (!canSendCommand(proto, command)) {
         if (error)
@@ -138,11 +141,13 @@ inline QByteArray packCommand(int proto, int command, QString* error)
     if (proto == 6)
         return command == 0 ? QByteArray("{\"name\":\"alphaStartTest\"}")
                             : QByteArray("{\"name\":\"alphaStopTest\"}");
+    if (proto == 8)
+        return LhgkWire::buildNetControl(command);
     return command == 0 ? QByteArray("calcStart") : QByteArray("calcEnd");
 }
 
 // 按 SocketComm 测数分支组网口测量帧
-inline QByteArray packMeasurement(int proto, double force, double temp, QString* error)
+inline QByteArray packMeasurement(int proto, double force, double temp, QString* error = nullptr)
 {
     if (!canSendMeasurement(proto)) {
         if (error)
@@ -160,6 +165,8 @@ inline QByteArray packMeasurement(int proto, double force, double temp, QString*
         const SansiMeasurement measurement = {force, 0.0, 0.0};
         return QByteArray(reinterpret_cast<const char*>(&measurement), sizeof(measurement));
     }
+    if (proto == 8)
+        return LhgkWire::buildNetMeasurementToDll(force, temp);
     return QStringLiteral("TL%1E0D0M0").arg(force, 0, 'f', 2).toLatin1();
 }
 
@@ -312,6 +319,8 @@ inline ProtocolResult parseReply(int proto, const QByteArray& raw)
         return parseNbc(raw);
     if (proto == 7)
         return parseNbcLine(raw);
+    if (proto == 8)
+        return LhgkWire::parseNetFrame(raw);
     return ProtocolResult{true, true, false, false, 0.0, 0.0,
                           QStringLiteral("该协议库无业务回发")};
 }

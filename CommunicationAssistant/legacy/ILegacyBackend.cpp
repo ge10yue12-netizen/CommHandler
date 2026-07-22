@@ -317,12 +317,75 @@ Result CommHandlerBackend::sendValues(const QVector<double>& values)
 #else
     if (!handler_ || !connected_)
         return Result::fail(QStringLiteral("not_connected"), QStringLiteral("Legacy 未连接"));
+
+    // 对齐 DLL 静默 return 分支，改为显式失败，避免 UI 假成功
+    const bool isSerial = (config_.commType == 1);
+    const int proto = config_.protocolIndex;
+    if (!isSerial) {
+        if (proto == 2 && values.size() != 2) {
+            return Result::fail(QStringLiteral("invalid_value_count"),
+                                QStringLiteral("中机数值发送需要恰好 2 个数值，当前 %1 个").arg(values.size()));
+        }
+        if (proto == 3) {
+            return Result::fail(QStringLiteral("capability_denied"),
+                                QStringLiteral("网口三思：动态库无数值发送编码分支，不会写出线帧"));
+        }
+        if (proto == 7 && values.size() != 4) {
+            return Result::fail(QStringLiteral("invalid_value_count"),
+                                QStringLiteral("纳百川线条需要恰好 4 个数值，当前 %1 个").arg(values.size()));
+        }
+        if (proto == 8 && values.size() < 2) {
+            return Result::fail(QStringLiteral("invalid_value_count"),
+                                QStringLiteral("联恒网口至少需要 2 个数值（力、温），当前 %1 个").arg(values.size()));
+        }
+    } else {
+        if (proto == 1 && values.isEmpty()) {
+            return Result::fail(QStringLiteral("invalid_value_count"),
+                                QStringLiteral("科新数值发送至少需要 1 个数值"));
+        }
+        if (proto == 3 && values.size() < 5) {
+            return Result::fail(QStringLiteral("invalid_value_count"),
+                                QStringLiteral("串口 IEEE 至少需要 5 个数值，当前 %1 个").arg(values.size()));
+        }
+        if ((proto == 4 || proto == 5) && values.size() < 2) {
+            return Result::fail(QStringLiteral("invalid_value_count"),
+                                QStringLiteral("该串口协议至少需要 2 个数值，当前 %1 个").arg(values.size()));
+        }
+        if (proto == 2) {
+            return Result::fail(QStringLiteral("capability_denied"),
+                                QStringLiteral("时代新材：动态库无数值发送编码分支"));
+        }
+    }
+
+    auto* h = static_cast<CommHandler*>(handler_);
+    bool inquireOk = true;
+    try {
+        inquireOk = h->getParameter<bool>(QStringLiteral("bInquireSendFlag"));
+    } catch (...) {
+        inquireOk = true;
+    }
+    if (!inquireOk) {
+        return Result::fail(
+            QStringLiteral("dll_send_gated"),
+            QStringLiteral("动态库未开放发送许可（bInquireSendFlag=false）；"
+                           "联恒等协议需先收到开始/流控后再发"));
+    }
+
     std::vector<double> v;
     v.reserve(static_cast<size_t>(values.size()));
     for (double d : values)
         v.push_back(d);
-    const CommType ct = (config_.commType == 1) ? SERIAL : NETWORK;
-    static_cast<CommHandler*>(handler_)->SendData(v, ct);
+    const CommType ct = isSerial ? SERIAL : NETWORK;
+    h->SendData(v, ct);
+
+    // UDP 等传输在 DLL 内会清许可；非流控协议自动恢复，便于连续联调
+    const bool needsStreamGate = (!isSerial && proto == 8) || (isSerial && proto == 5);
+    if (!needsStreamGate) {
+        try {
+            h->setParameter(QStringLiteral("bInquireSendFlag"), true);
+        } catch (...) {
+        }
+    }
     return Result::success();
 #endif
 }

@@ -618,6 +618,10 @@ void MainWindow::buildUi()
     if (legacyModelCombo_)
         connect(legacyModelCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
                 applyEndpoint(QStringLiteral("兼容传输角色")));
+    // TCP/UDP 传输方式变更须触发热重连（此前漏绑导致已连接时改项无效）
+    if (legacyTransferCombo_)
+        connect(legacyTransferCombo_, QOverload<int>::of(&QComboBox::currentIndexChanged), this,
+                applyEndpoint(QStringLiteral("兼容传输方式")));
     connect(btnSend_, &QPushButton::clicked, this, &MainWindow::onSendClicked);
     connect(btnClear_, &QPushButton::clicked, this, &MainWindow::onClearLogClicked);
     connect(btnDisconnectClient_, &QPushButton::clicked, this, &MainWindow::onDisconnectClientClicked);
@@ -775,6 +779,10 @@ void MainWindow::refreshLegacyCapabilityTips()
         lines << QStringLiteral("时代新材：对端发 value,num,TYPE,flag\\r\\n；助手仅显示第 1 段数值");
     if (kind == ca::LegacyCommKind::Network && proto == 7)
         lines << QStringLiteral("纳百川线条：calcStart/calcEnd 文本与等价 HEX 字节均应触发控制事件");
+    if (profile.supports(ca::LegacyCapability::RequiresStreamingState)
+        || profile.supports(ca::LegacyCapability::RequiresPollingPermission))
+        lines << QStringLiteral(
+            "联恒等协议：发送前须获动态库发送许可（对端开始/流控）；未许可时发送会被拒绝而非静默成功");
     // 展示 ReceiveValues / SendEncodedValues 的 limitation 说明
     const QString rxLim = profile.entries.value(static_cast<int>(ca::LegacyCapability::ReceiveValues)).limitation;
     if (!rxLim.isEmpty())
@@ -1232,6 +1240,14 @@ ca::Result MainWindow::buildLegacySendRequestFrom(const QString& textIn, int for
         if (parseValues(&vals, &bad)) {
             const QString lim =
                 p.entries.value(static_cast<int>(ca::LegacyCapability::SendEncodedValues)).limitation;
+            // 与 LegacySession 门控对齐：恰好 N / 至少 N
+            if (lim.contains(QStringLiteral("恰好 4")) && vals.size() != 4) {
+                if (error)
+                    *error = QStringLiteral("协议「%1」数值发送需要恰好 4 个数值（如 L1,b1,Le1,bo1），当前 %2 个")
+                                 .arg(protoLabel)
+                                 .arg(vals.size());
+                return ca::Result::fail(QStringLiteral("invalid_value_count"), QStringLiteral("数值个数不符"));
+            }
             if (lim.contains(QStringLiteral("5")) && vals.size() < 5) {
                 if (error)
                     *error = QStringLiteral("协议「%1」数值发送至少需要 5 个数值，当前 %2 个")
@@ -1345,10 +1361,15 @@ QString MainWindow::formatRecordForDisplay(const ca::CommRecord& record) const
 void MainWindow::onOpenClicked()
 {
     ca::ICommSession* sess = activeSession();
-    if (sess->state() == ca::SessionState::Connected) {
+    if (sess->state() == ca::SessionState::Connected
+        || session_.state() == ca::SessionState::Connected
+        || legacySession_.state() == ca::SessionState::Connected) {
+        // 关闭双会话，避免模式切换后残留占口的非活动连接
         pendingReopenAfterConfig_ = false;
-        capture_.stopSession(sess->sessionId());
-        sess->close();
+        capture_.stopSession(session_.sessionId());
+        capture_.stopSession(legacySession_.sessionId());
+        session_.close();
+        legacySession_.close();
         syncUi();
         return;
     }
@@ -1357,11 +1378,14 @@ void MainWindow::onOpenClicked()
     openWithCurrentUiConfig();
 }
 
-// 已连接时修改侧栏配置：关闭当前会话，Closed 后按新 UI 自动重开
+// 已连接时修改侧栏配置：关闭双会话后按新 UI 自动重开（防非活动会话残留占口）
 void MainWindow::requestApplyConnectedConfig(const QString& reason)
 {
-    ca::ICommSession* sess = activeSession();
-    if (!sess || sess->state() != ca::SessionState::Connected)
+    const bool nativeUp = (session_.state() == ca::SessionState::Connected
+                           || session_.state() == ca::SessionState::Opening);
+    const bool legacyUp = (legacySession_.state() == ca::SessionState::Connected
+                           || legacySession_.state() == ca::SessionState::Opening);
+    if (!nativeUp && !legacyUp)
         return;
     if (pendingReopenAfterConfig_)
         return;
@@ -1369,8 +1393,10 @@ void MainWindow::requestApplyConnectedConfig(const QString& reason)
     appendLog(QStringLiteral("[配置] 已修改「%1」，正在按新参数重连…").arg(reason));
     scheduler_.stopAll();
     activeSchedTaskId_ = QUuid();
-    capture_.stopSession(sess->sessionId());
-    sess->close();
+    capture_.stopSession(session_.sessionId());
+    capture_.stopSession(legacySession_.sessionId());
+    session_.close();
+    legacySession_.close();
     syncUi();
 }
 
@@ -1437,8 +1463,10 @@ void MainWindow::openWithCurrentUiConfig()
 void MainWindow::onCloseClicked()
 {
     pendingReopenAfterConfig_ = false;
-    capture_.stopSession(activeSession()->sessionId());
-    activeSession()->close();
+    capture_.stopSession(session_.sessionId());
+    capture_.stopSession(legacySession_.sessionId());
+    session_.close();
+    legacySession_.close();
     syncUi();
 }
 
@@ -1693,6 +1721,11 @@ void MainWindow::onClearLogClicked()
 
 void MainWindow::onRecordReceived(const ca::CommRecord& record)
 {
+    // 非活动会话记录不进 UI，避免模式切换后双通道串扰
+    const ca::ICommSession* active = activeSession();
+    if (active && record.sessionId != active->sessionId())
+        return;
+
     const ca::Result cap = capture_.enqueue(record);
     if (!cap.ok && cap.code == QStringLiteral("capture_queue_full"))
         appendLog(QStringLiteral("[异常] 抓包队列满：%1").arg(cap.message));
@@ -1753,6 +1786,27 @@ void MainWindow::onRecordReceived(const ca::CommRecord& record)
 
 void MainWindow::onSessionStateChanged(ca::SessionState state)
 {
+    const QObject* src = sender();
+    const bool fromActive = (isLegacyMode() && src == static_cast<QObject*>(&legacySession_))
+                            || (!isLegacyMode() && src == static_cast<QObject*>(&session_));
+
+    // 热重连：双会话均已关闭后再按当前 UI 打开，避免抢跑或重复 open
+    if (pendingReopenAfterConfig_ && state == ca::SessionState::Closed) {
+        const bool bothClosed = (session_.state() == ca::SessionState::Closed
+                                 || session_.state() == ca::SessionState::Created)
+                                && (legacySession_.state() == ca::SessionState::Closed
+                                    || legacySession_.state() == ca::SessionState::Created);
+        if (bothClosed) {
+            pendingReopenAfterConfig_ = false;
+            QTimer::singleShot(0, this, [this]() { openWithCurrentUiConfig(); });
+        }
+    }
+
+    if (!fromActive) {
+        syncUi();
+        return;
+    }
+
     if (state != lastSessionState_) {
         const bool wasUp = (lastSessionState_ == ca::SessionState::Connected
                             || lastSessionState_ == ca::SessionState::Opening);
@@ -1773,12 +1827,6 @@ void MainWindow::onSessionStateChanged(ca::SessionState state)
         || state == ca::SessionState::Unresponsive) {
         capture_.stopSession(session_.sessionId());
         capture_.stopSession(legacySession_.sessionId());
-    }
-
-    // 热重连：关闭完成后按当前 UI 重新打开
-    if (pendingReopenAfterConfig_ && state == ca::SessionState::Closed) {
-        pendingReopenAfterConfig_ = false;
-        QTimer::singleShot(0, this, [this]() { openWithCurrentUiConfig(); });
     }
 
     syncUi();

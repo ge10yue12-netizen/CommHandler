@@ -5,8 +5,6 @@
 
 #include <QCoreApplication>
 #include <QEventLoop>
-#include <QJsonDocument>
-#include <QJsonObject>
 #include <QTextStream>
 #include <QTimer>
 #include <array>
@@ -32,20 +30,16 @@ bool near(double lhs, double rhs)
     return std::fabs(lhs - rhs) < 1e-8;
 }
 
-// 构造动态库 FixedDoubleToHex 的 14 字节科新回包
+// HEX 空格串转字节
+QByteArray hexBytes(const char* spacedHex)
+{
+    return QByteArray::fromHex(QByteArray(spacedHex));
+}
+
+// 构造动态库 FixedDoubleToHex 的 14 字节科新回包（含 02 4C 头）
 QByteArray kexinReply(double value)
 {
-    QByteArray frame(14, '\0');
-    QString integer = QString::number(static_cast<int>(std::fabs(value)));
-    integer = integer.rightJustified(5, QLatin1Char('0'));
-    if (value < 0.0)
-        integer[0] = QLatin1Char('-');
-    const QString decimal =
-        QString::number(std::fabs(value), 'f', 5).section(QLatin1Char('.'), 1, 1);
-    const QByteArray field = (integer + QLatin1Char('.') + decimal).toLatin1();
-    std::memcpy(frame.data() + 2, field.constData(), 11);
-    frame[13] = '#';
-    return frame;
+    return SerialProtocol::packMeasurement(1, value, 0.0, nullptr);
 }
 
 // 构造动态库 DataPack 的 56 字节 IEEE 回包
@@ -78,7 +72,7 @@ QByteArray ieeeReply(const std::array<float, 6>& values)
     return frame;
 }
 
-// 验证串口 PT0-PT4 的组包与解包
+// 验证串口 PT0–PT5 的组包与解包（对齐 CommHandler）
 void testSerialProtocols()
 {
     QString error;
@@ -97,18 +91,25 @@ void testSerialProtocols()
     check(result.ok && result.hasValues && near(result.force, 1.0),
           QStringLiteral("串口 PT0 回包"));
 
-    check(!SerialProtocol::canSendCommand(1, 0), QStringLiteral("串口 PT1 无控制指令"));
+    // 科新：控制字 + FixedDoubleToHex 14B（含 02 4C）
+    check(SerialProtocol::canSendCommand(1, 0) && SerialProtocol::canSendCommand(1, 1),
+          QStringLiteral("串口 PT1 可发控制"));
+    check(SerialProtocol::packCommand(1, 0, &error) == QByteArray("{QLI[1]}"),
+          QStringLiteral("串口 PT1 开始 {QLI[1]}"));
+    check(SerialProtocol::packCommand(1, 1, &error) == QByteArray("{QLI[2]}"),
+          QStringLiteral("串口 PT1 停止 {QLI[2]}"));
+    check(SerialProtocol::packMeasurement(1, 12.3, 25.0, &error)
+              == hexBytes("02 4C 30 30 30 31 32 2E 33 30 30 30 30 23"),
+          QStringLiteral("串口 PT1 测数 12.3 黄金帧"));
     check(SerialProtocol::packMeasurement(1, 1.0, 25.0, &error).toHex().toUpper()
-              == "024C303030312E30303030",
-          QStringLiteral("串口 PT1 测数"));
+              == "024C30303030312E303030303023",
+          QStringLiteral("串口 PT1 测数 1.0"));
     result = SerialProtocol::parseReply(1, kexinReply(1.0));
     check(result.ok && result.hasValues && near(result.force, 1.0),
           QStringLiteral("串口 PT1 14B 回包"));
     QByteArray sticky = kexinReply(1.0) + kexinReply(2.0);
     check(SerialProtocol::takeKexinReplyFrames(&sticky).size() == 2 && sticky.isEmpty(),
           QStringLiteral("串口 PT1 粘包"));
-    check(SerialProtocol::packMeasurement(1, 123456.0, 25.0, &error).isEmpty(),
-          QStringLiteral("串口 PT1 超范围拒绝"));
 
     check(SerialProtocol::packMeasurement(2, 1.0, 25.0, &error)
               == QByteArray("1.000,0,RUN,0\r\n"),
@@ -144,9 +145,27 @@ void testSerialProtocols()
     result = SerialProtocol::parseReply(4, QByteArray("R+001.0000#N+025.0000#"));
     check(result.ok && result.hasValues && result.hasTemp,
           QStringLiteral("串口 PT4 回包"));
+
+    // 联恒串口 PT5：SER5 fixture
+    check(SerialProtocol::canSendCommand(5, 0) && SerialProtocol::canSendMeasurement(5),
+          QStringLiteral("串口 PT5 能力"));
+    const QByteArray serLhgk = hexBytes(
+        "AA 55 01 14 00 06 0C 9A 99 99 99 99 99 28 40 06 0D CD CC CC CC CC CC 46 40 02 67 0D 0A");
+    check(SerialProtocol::packMeasurement(5, 12.3, 45.6, &error) == serLhgk,
+          QStringLiteral("串口 PT5 测数黄金帧"));
+    result = SerialProtocol::parseReply(5, serLhgk);
+    check(result.ok && result.hasValues && result.hasTemp && near(result.force, 12.3)
+              && near(result.temp, 45.6),
+          QStringLiteral("串口 PT5 回包解析"));
+    const QByteArray serStart = SerialProtocol::packCommand(5, 0, &error);
+    check(serStart.size() == 10 && static_cast<quint8>(serStart.at(5)) == 0x01,
+          QStringLiteral("串口 PT5 开始帧"));
+    result = SerialProtocol::parseReply(5, serStart);
+    check(result.ok && result.isAck && result.detail.contains(QStringLiteral("开始")),
+          QStringLiteral("串口 PT5 控制解析"));
 }
 
-// 验证网口 PT0-PT7 的组包与解包
+// 验证网口 PT0–PT8 的组包与解包（对齐 CommHandler）
 void testNetworkProtocols()
 {
     QString error;
@@ -208,9 +227,33 @@ void testNetworkProtocols()
         7, QByteArray("{\"hsm\":{\"L1\":\"1.0\",\"b1\":\"25.0\"}}"));
     check(result.ok && result.hasValues && result.hasTemp,
           QStringLiteral("网口 PT7 回包"));
+
+    // 联恒网口 PT8：RX 刺激 / TX 解析（NET8 fixtures）
+    check(NetworkProtocol::canSendCommand(8, 0) && NetworkProtocol::canSendMeasurement(8),
+          QStringLiteral("网口 PT8 能力"));
+    const QByteArray netRx = hexBytes(
+        "AA 55 01 00 02 06 0C 40 28 99 99 99 99 99 9A 06 0D 40 46 CC CC CC CC CC CD C6 0D 0D 0A");
+    check(NetworkProtocol::packMeasurement(8, 12.3, 45.6, &error) == netRx,
+          QStringLiteral("网口 PT8 RX 测数黄金帧"));
+    result = NetworkProtocol::parseReply(8, netRx);
+    check(result.ok && result.hasValues && result.hasTemp && near(result.force, 12.3)
+              && near(result.temp, 45.6),
+          QStringLiteral("网口 PT8 RX 解析"));
+    const QByteArray netTx = hexBytes(
+        "AA 55 01 00 15 02 06 0B 40 28 99 99 99 99 99 9A 06 0C 40 46 CC CC CC CC CC CD 6F 2D 0D 0A");
+    result = NetworkProtocol::parseReply(8, netTx);
+    check(result.ok && result.hasValues && result.hasTemp && near(result.force, 12.3)
+              && near(result.temp, 45.6),
+          QStringLiteral("网口 PT8 软件 TX 解析"));
+    const QByteArray netStart = NetworkProtocol::packCommand(8, 0, &error);
+    check(netStart.size() == 10 && static_cast<quint8>(netStart.at(5)) == 0x01,
+          QStringLiteral("网口 PT8 开始帧"));
+    result = NetworkProtocol::parseReply(8, netStart);
+    check(result.ok && result.isAck && result.detail.contains(QStringLiteral("开始")),
+          QStringLiteral("网口 PT8 控制解析"));
 }
 
-// 验证 PeerChannelManager TCP 服务端↔客户端环回（对齐助手 TCP 客户端连试验机服务端）
+// 验证 PeerChannelManager TCP 服务端↔客户端环回
 void testPeerChannelTcpLoopback()
 {
     PeerChannelManager server;

@@ -1,6 +1,7 @@
 // SerialProtocol.h — 试验机串口协议适配，严格对齐 SerialPortComm
 #pragma once
 
+#include "LhgkWire.h"
 #include "ProtocolResult.h"
 
 #include <QByteArray>
@@ -15,29 +16,30 @@
 
 namespace SerialProtocol {
 
-// 判断动态库串口收路径是否支持指定控制指令
+// 判断动态库串口收路径是否支持指定控制指令（对齐当前 CommHandler）
 inline bool canSendCommand(int proto, int command)
 {
-    return (proto == 0 && command >= 0 && command <= 3)
-        || (proto == 3 && (command == 0 || command == 1));
+    if (proto == 0)
+        return command >= 0 && command <= 3;
+    if (proto == 1 || proto == 3 || proto == 5)
+        return command == 0 || command == 1;
+    return false;
 }
 
 // 判断动态库串口收路径是否能产生测量数据信号
 inline bool canSendMeasurement(int proto)
 {
-    return proto >= 0 && proto <= 2;
+    return proto == 0 || proto == 1 || proto == 2 || proto == 5;
 }
 
 // 返回动态库串口入站能力限制
 inline QString unsupportedReason(int proto, bool command)
 {
     if (command) {
-        if (proto == 1)
-            return QStringLiteral("科新库不产生控制事件");
         if (proto == 2)
-            return QStringLiteral("时代新材库不产生控制事件");
+            return QStringLiteral("时代新材库无控制事件分支");
         if (proto == 4)
-            return QStringLiteral("冠腾库仅实现业务出站");
+            return QStringLiteral("冠腾库仅实现业务出站，无控制入站");
         return QStringLiteral("该串口协议不支持此指令");
     }
     if (proto == 3)
@@ -108,7 +110,7 @@ inline bool write(QSerialPort* port, const QByteArray& frame, QString* hex)
 }
 
 // 按 SerialPortComm 控制分支组串口指令
-inline QByteArray packCommand(int proto, int command, QString* error)
+inline QByteArray packCommand(int proto, int command, QString* error = nullptr)
 {
     if (!canSendCommand(proto, command)) {
         if (error)
@@ -120,6 +122,12 @@ inline QByteArray packCommand(int proto, int command, QString* error)
                                          {char(0x6B), char(0x0D)}, {char(0x5A), char(0x0D)}};
         return QByteArray(frames[command], 2);
     }
+    if (proto == 1) {
+        // MatchCtrlData：{QLI[1]} 开始 / {QLI[2]} 停止
+        return command == 0 ? QByteArray("{QLI[1]}") : QByteArray("{QLI[2]}");
+    }
+    if (proto == 5)
+        return LhgkWire::buildSerialControl(command);
     return command == 0 ? QByteArray("\x24\x00\x0D\x0A", 4)
                         : QByteArray("\x24\xFF\x0D\x0A", 4);
 }
@@ -158,23 +166,40 @@ inline QString hexToFloatAscii(const QByteArray& hexLatin1)
     return QString::fromLatin1(ascii);
 }
 
-// 对齐 SerialPortComm::MsgDataInput PT1：组 9 字节 ASCII 力值体（HexToFloat 可解码）
-inline QByteArray encodeKexinMeasurementBody(double force)
+// 对齐 SerialPortComm::FixedDoubleToHex：组 14 字节线帧（含 02 4C 头与 # 尾）
+inline QByteArray encodeFixedDoubleToHexFrame(double force)
 {
-    const QString numeric = QString::number(qAbs(force), 'f', 4);
-    const int capacity = force < 0.0 ? 8 : 9;
-    if (!qIsFinite(force) || numeric.size() > capacity)
+    if (!qIsFinite(force))
         return {};
-    QString body;
-    if (force < 0.0) {
-        const int pad = 8 - numeric.size();
-        const QString digits = QString(pad, QLatin1Char('0')) + numeric;
-        body = QLatin1Char('-') + digits;
-    } else {
-        const int pad = 9 - numeric.size();
-        body = QString(pad, QLatin1Char('0')) + numeric;
+    QByteArray frame(14, char(0x30));
+    frame[0] = char(0x02);
+    frame[1] = char(0x4C);
+    frame[7] = char(0x2E);
+    frame[13] = char(0x23);
+    const QString sData = QString::number(force, 'f', 5);
+    const int iIndex = sData.indexOf(QLatin1Char('.'));
+    if (iIndex <= 0)
+        return frame;
+    int iStartPos = 0;
+    if (iIndex > 4)
+        iStartPos = iIndex - 5;
+    QString sInteger = sData.mid(iStartPos, iIndex - iStartPos);
+    if (force < 0.0 && !sInteger.isEmpty() && sInteger.at(0) == QLatin1Char('-'))
+        sInteger = sInteger.mid(1);
+    QString sDecimal = (iIndex + 1 < sData.size()) ? sData.mid(iIndex + 1) : QString();
+    while (sInteger.size() < 5)
+        sInteger.prepend(QLatin1Char('0'));
+    while (sDecimal.size() < 5)
+        sDecimal.append(QLatin1Char('0'));
+    for (int i = 2; i < 7; ++i) {
+        if (force < 0.0 && i == 2)
+            frame[i] = char(0x2D);
+        else
+            frame[i] = sInteger.at(i - 2).toLatin1();
     }
-    return body.toLatin1();
+    for (int i = 8; i < 13; ++i)
+        frame[i] = sDecimal.at(i - 8).toLatin1();
+    return frame;
 }
 
 // 对齐 SerialPortComm::FixedDoubleToHex（SendData PT1 case 1）：解析 14 字节回包
@@ -186,6 +211,13 @@ inline bool decodeFixedDoubleToHexReply(const QByteArray& raw, double* forceOut,
         return false;
     }
     const QByteArray frame = raw.left(14);
+    // FixedDoubleToHex 前缀固定 02 4C（与收端 024C 匹配）
+    if (static_cast<unsigned char>(frame.at(0)) != 0x02
+        || static_cast<unsigned char>(frame.at(1)) != 0x4C) {
+        if (detail)
+            *detail = QStringLiteral("科新回包前两字节应为 02 4C");
+        return false;
+    }
     if (static_cast<unsigned char>(frame.at(13)) != 0x23) {
         if (detail)
             *detail = QStringLiteral("科新回包第 14 字节应为 '#' (0x23)");
@@ -232,7 +264,7 @@ inline QList<QByteArray> takeKexinReplyFrames(QByteArray* buffer)
 }
 
 // 按 SerialPortComm 测数分支组串口测量帧
-inline QByteArray packMeasurement(int proto, double force, double /*temp*/, QString* error)
+inline QByteArray packMeasurement(int proto, double force, double temp, QString* error = nullptr)
 {
     if (!canSendMeasurement(proto)) {
         if (error)
@@ -251,33 +283,25 @@ inline QByteArray packMeasurement(int proto, double force, double /*temp*/, QStr
         return frame;
     }
     if (proto == 1) {
-        const QByteArray payload = encodeKexinMeasurementBody(force);
-        if (payload.size() != 9) {
+        // 对端注入与 DLL 出站同一 FixedDoubleToHex 14B；收端取 024C 后 18 HEX
+        const QByteArray frame = encodeFixedDoubleToHexFrame(force);
+        if (frame.size() != 14) {
             if (error)
-                *error = QStringLiteral("科新力值超出 9 字节 ASCII 测数体范围");
+                *error = QStringLiteral("科新测数帧必须为 14 字节");
             return {};
         }
-        const QByteArray hexLatin1 = payload.toHex().toUpper();
-        if (hexLatin1.size() != 18) {
-            if (error)
-                *error = QStringLiteral("科新测数 HEX 体应为 18 字符，当前 %1").arg(hexLatin1.size());
-            return {};
-        }
+        const QByteArray hexBody = frame.mid(2, 9).toHex().toUpper();
         bool ok = false;
-        const double roundTrip = hexToFloatAscii(hexLatin1).toDouble(&ok);
+        const double roundTrip = hexToFloatAscii(hexBody).toDouble(&ok);
         if (!ok || qAbs(roundTrip - force) > 1e-3) {
             if (error)
                 *error = QStringLiteral("科新测数体未通过 HexToFloat 往返校验");
             return {};
         }
-        const QByteArray frame = QByteArray("\x02\x4C", 2) + payload;
-        if (frame.size() != 11) {
-            if (error)
-                *error = QStringLiteral("科新测数帧必须为 11 字节，当前 %1 字节").arg(frame.size());
-            return {};
-        }
         return frame;
     }
+    if (proto == 5)
+        return LhgkWire::buildSerialMeasurement(force, temp);
     return QStringLiteral("%1,0,RUN,0\r\n").arg(force, 0, 'f', 3).toLatin1();
 }
 
@@ -434,6 +458,36 @@ inline ProtocolResult parseGuanteng(const QByteArray& raw)
     return result;
 }
 
+// 联恒串口软件回包缓冲：按 AA55…0D0A 切完整帧
+inline QList<QByteArray> takeLhgkSerialReplyFrames(QByteArray* buffer)
+{
+    QList<QByteArray> frames;
+    if (!buffer)
+        return frames;
+    while (true) {
+        const int sync = buffer->indexOf(QByteArray("\xAA\x55", 2));
+        if (sync < 0) {
+            buffer->clear();
+            break;
+        }
+        if (sync > 0)
+            buffer->remove(0, sync);
+        if (buffer->size() < 9)
+            break;
+        const quint16 length = static_cast<quint16>(static_cast<quint8>(buffer->at(3))
+                                                    | (static_cast<quint8>(buffer->at(4)) << 8));
+        const int total = 9 + static_cast<int>(length);
+        if (buffer->size() < total)
+            break;
+        const QByteArray frame = buffer->left(total);
+        buffer->remove(0, total);
+        if (frame.size() >= 2 && static_cast<quint8>(frame.at(frame.size() - 2)) == 0x0D
+            && static_cast<quint8>(frame.at(frame.size() - 1)) == 0x0A)
+            frames.append(frame);
+    }
+    return frames;
+}
+
 // 按串口协议分派软件回包解析
 inline ProtocolResult parseReply(int proto, const QByteArray& raw)
 {
@@ -447,6 +501,8 @@ inline ProtocolResult parseReply(int proto, const QByteArray& raw)
         return parseIeee(raw);
     if (proto == 4)
         return parseGuanteng(raw);
+    if (proto == 5)
+        return LhgkWire::parseSerialMeasurement(raw);
     return ProtocolResult{true, false, false, false, 0.0, 0.0,
                           QStringLiteral("时代新材库无业务出站")};
 }

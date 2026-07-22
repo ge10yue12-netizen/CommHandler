@@ -27,6 +27,20 @@
 
 虚拟串口对两端各选一 COM；波特率/数据位/校验/停止位一致（默认 115200 8N1）。`port_index`：0=COM1。
 
+## 协议对齐范围（与 CommHandler）
+
+试验机**不链接** CommHandler DLL，但线帧必须与库一致，用于刺激助手：
+
+| 通道 | 已对齐项 |
+|---|---|
+| 串口 0–4 | 既有三思/科新/时代/IEEE/冠腾 |
+| 串口 1 科新 | 控制 `{QLI[1]}`/`{QLI[2]}`；测数 14B `02 4C…#` |
+| 串口 5 联恒 | 控制 type=0x02；测数 SER5 黄金帧 |
+| 网口 0–7 | 既有 JSON/万测/中机/三思/威盛/纳百川 |
+| 网口 8 联恒 | 刺激发 **RX** 布局；解析软件 **TX** 布局（TX≠RX） |
+
+下拉协议列表含串口「5 联恒光科」、网口「8 联恒光科」。详情见 `SELFTEST.md` 与 `docs/fixtures/comm/`。
+
 ## 自检
 
 ```text
@@ -35,4 +49,4 @@ msbuild ProtocolTests.vcxproj /p:Configuration=Debug /p:Platform=x64
 tests\x64\Debug\ProtocolTests.exe
 ```
 
-期望：`TOTAL_FAILURES 0`（含 TCP/UDP 环回）。
+期望：`TOTAL_FAILURES 0`（协议黄金帧 + TCP/UDP 环回）。

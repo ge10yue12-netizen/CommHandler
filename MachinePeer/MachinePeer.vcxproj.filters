@@ -25,6 +25,7 @@
     <ClInclude Include="src\NetworkProtocol.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\ProtocolResult.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\SerialProtocol.h"><Filter>Header Files</Filter></ClInclude>
+    <ClInclude Include="src\LhgkWire.h"><Filter>Header Files</Filter></ClInclude>
     <ClInclude Include="src\IniUtil.h"><Filter>Header Files</Filter></ClInclude>
   </ItemGroup>
   <ItemGroup>
