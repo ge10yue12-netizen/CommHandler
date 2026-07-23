@@ -330,7 +330,7 @@ Result CommHandlerBackend::sendValues(const QVector<double>& values)
         }
         if (proto == 3) {
             return Result::fail(QStringLiteral("capability_denied"),
-                                QStringLiteral("网口三思：动态库无数值发送编码分支，不会写出线帧"));
+                                QStringLiteral("网口三思：本协议不支持数值发送，不会写出线帧"));
         }
         if (proto == 7 && values.size() != 4) {
             return Result::fail(QStringLiteral("invalid_value_count"),
@@ -359,7 +359,7 @@ Result CommHandlerBackend::sendValues(const QVector<double>& values)
         }
         if (proto == 2) {
             return Result::fail(QStringLiteral("capability_denied"),
-                                QStringLiteral("不能发：时代新材动态库无数值发送编码分支"));
+                                QStringLiteral("不能发：时代新材不支持数值发送"));
         }
     }
 
@@ -373,8 +373,7 @@ Result CommHandlerBackend::sendValues(const QVector<double>& values)
     if (!inquireOk) {
         return Result::fail(
             QStringLiteral("dll_send_gated"),
-            QStringLiteral("动态库未开放发送许可（bInquireSendFlag=false）；"
-                           "联恒等协议需先收到开始/流控后再发"));
+            QStringLiteral("尚未获得发送许可；联恒等协议需先收到开始/流控后再发"));
     }
 
     std::vector<double> v;

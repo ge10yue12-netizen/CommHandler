@@ -2,6 +2,7 @@
 
 #include "HexUtil.h"
 #include "LegacyCapability.h"
+#include "LegacyWirePreview.h"
 
 #include <QRegularExpression>
 
@@ -212,13 +213,13 @@ void fillNetworkProtocols(QComboBox* box)
 void fillSerialProtocols(QComboBox* box)
 {
     box->clear();
-    // 标签对齐 CommLab ProtoGuide / 基线 §14.3（含 V1.2.5 联恒=5）
+    // 名称不含口语门槛短语；入参要求见能力说明【数据边界】
     box->addItem(QStringLiteral("0 三思"), 0);
     box->addItem(QStringLiteral("1 科新"), 1);
     box->addItem(QStringLiteral("2 时代新材"), 2);
-    box->addItem(QStringLiteral("3 IEEE（≥5 值）"), 3);
-    box->addItem(QStringLiteral("4 冠腾（≥2 值）"), 4);
-    box->addItem(QStringLiteral("5 联恒光科（≥2 值）"), 5);
+    box->addItem(QStringLiteral("3 IEEE"), 3);
+    box->addItem(QStringLiteral("4 冠腾"), 4);
+    box->addItem(QStringLiteral("5 联恒光科"), 5);
 }
 
 } // namespace
@@ -919,62 +920,38 @@ void MainWindow::refreshLegacyCapabilityTips()
     const QString lim = profile.entries.value(static_cast<int>(ca::LegacyCapability::SendEncodedValues)).limitation;
     const QString rxLim = profile.entries.value(static_cast<int>(ca::LegacyCapability::ReceiveValues)).limitation;
     if (!lim.isEmpty() || !rxLim.isEmpty()) {
-        lines << QStringLiteral("【边界约束】");
+        lines << QStringLiteral("【能力限制】");
         if (!lim.isEmpty())
-            lines << QStringLiteral("· 发送：%1").arg(lim);
+            lines << QStringLiteral("· 发送侧：%1").arg(lim);
         if (!rxLim.isEmpty())
-            lines << QStringLiteral("· 接收：%1").arg(rxLim);
+            lines << QStringLiteral("· 接收侧：%1").arg(rxLim);
     }
+
+    const int dataBits = legacyDataBitsCombo_ ? legacyDataBitsCombo_->currentData().toInt()
+                                              : (dataBitsCombo_ ? dataBitsCombo_->currentData().toInt() : 8);
+    const QStringList boundTips = ca::legacyDataBoundaryTips(kind, proto, dataBits);
+    if (!boundTips.isEmpty()) {
+        lines << QStringLiteral("【数据边界】");
+        for (const QString& t : boundTips)
+            lines << QStringLiteral("· %1").arg(t);
+    }
+
+    lines << QStringLiteral("【数据显示】");
+    lines << QStringLiteral("· 「发送」字段为协议实际写出字节预览（非输入框原文）");
+    lines << QStringLiteral("· 二进制帧默认以十六进制展示；ASCII 帧以可读文本展示（CR/LF 转义）");
 
     if (!profile.supports(ca::LegacyCapability::SendEncodedValues)
         && !profile.supports(ca::LegacyCapability::SendTransparentText))
-        lines << QStringLiteral("· 当前协议无可用发送路径；发起发送将被拒绝并记入运行日志");
-
-    lines << QStringLiteral("【日志关注】");
-    lines << QStringLiteral("· [连接]：开闭与就绪状态");
-    lines << QStringLiteral("· [边界]：能力拒绝、未解析 RX、参数不合法");
-    lines << QStringLiteral("· [异常]：发送失败、会话错误");
-    lines << QStringLiteral("· 数据区：测数/控制事件/已提交载荷");
-
-    lines << QStringLiteral("【通用限制】");
-    lines << QStringLiteral("· 兼容动态库不支持原始十六进制发送；线帧级核对请使用原生通道");
-
-    const bool binaryWire =
-        (kind == ca::LegacyCommKind::Network && (proto == 2 || proto == 8))
-        || (kind == ca::LegacyCommKind::Serial && proto == 5);
-    if (binaryWire)
-        lines << QStringLiteral("· 线帧为二进制；对端应以十六进制核对，勿以文本乱码判定失败");
-
-    if (kind == ca::LegacyCommKind::Network && proto == 0)
-        lines << QStringLiteral(
-            "· 网口 JSON：对端 {\"tn\":1}/{tn:3} 为控制收；工作台发数值编码为 tn:2。"
-            "自动 ACK 出现在数据区「协议应答」；未识别 JSON 记未解析边界");
-    if (kind == ca::LegacyCommKind::Network && proto == 2)
-        lines << QStringLiteral("· 中机：发送须恰好 2 路数值，库以定长二进制直发");
-    if (kind == ca::LegacyCommKind::Network && proto == 3)
-        lines << QStringLiteral("· 网口三思：动态库未实现数值发送分支，不会向链路写出数据");
-    if (kind == ca::LegacyCommKind::Network && proto == 7)
-        lines << QStringLiteral("· 纳百川线条：calcStart/calcEnd 文本与等价 HEX 字节均应触发控制事件");
-    if (kind == ca::LegacyCommKind::Network && proto == 8)
-        lines << QStringLiteral(
-            "· 联恒网口(iProtoType=8)：至少力、温两路；流式拼帧；完整坏帧报未解析，断帧等待不误报");
-    if (kind == ca::LegacyCommKind::Serial && proto == 0)
-        lines << QStringLiteral("· 串口三思：定宽 ASCII 数值段，以 0x0D 结束；对端文本模式通常可读");
-    if (kind == ca::LegacyCommKind::Serial && proto == 1)
-        lines << QStringLiteral(
-            "· 科新：发/收均为单路力值；控制字 HEX 7B51…5D7D（{QLI[1/2]}）对应开始/停止计算事件");
-    if (kind == ca::LegacyCommKind::Serial && proto == 2)
-        lines << QStringLiteral("· 时代新材：对端发 value,num,TYPE,flag\\r\\n；助手仅显示第 1 段数值");
-    if (kind == ca::LegacyCommKind::Serial && proto == 5)
-        lines << QStringLiteral(
-            "· 联恒串口(iProtocolType=5)：至少力、温两路；流式拼帧与 CRC；与正式库索引一致，不占用历史 case 0");
+        lines << QStringLiteral("· 当前协议无可用发送路径；发起发送将被拒绝并写入运行日志");
 
     if (profile.supports(ca::LegacyCapability::RequiresStreamingState)
         || profile.supports(ca::LegacyCapability::RequiresPollingPermission))
         lines << QStringLiteral(
-            "· 联恒等协议：发送前须获动态库发送许可（对端开始/流控）；未许可时发送会被拒绝而非静默成功");
+            "· 发送前须获得发送许可（对端开始/流控）；未许可时拒绝发送，不会静默成功");
 
-    lines << QStringLiteral("· 波形发送：仅在「能发数值」的协议可用；不能发的协议见上方能力说明");
+    lines << QStringLiteral("【通用说明】");
+    lines << QStringLiteral("· 本模式不支持原始十六进制发送；线帧级抓包请使用原生通道");
+    lines << QStringLiteral("· 波形发送仅在「发数值」能力可用时开放");
 
     legacyCapTipLabel_->setText(lines.join(QChar('\n')));
 }
@@ -1526,11 +1503,29 @@ QString MainWindow::formatRecordForDisplay(const ca::CommRecord& record) const
     // 收发设置严格分离：
     // - 「十六进制显示」只影响接收方向字节的展示
     // - 「十六进制发送」只影响发送方向字节的展示（与发送解析同源）
-    // - 均未勾选 → 原样 UTF-8 文本；不因未解析收包强制 HEX
-    if (legacyTx && !record.bytes.isEmpty()) {
-        // Legacy TX：bytes 为业务入参，非 DLL 线帧；展示不受「十六进制显示」影响
-        body += QStringLiteral(" | 入参 ") + QString::fromUtf8(record.bytes);
-        body += QStringLiteral(" | 线帧由动态库内部编码（接口不回传已发送原始字节；二进制协议请以十六进制核对对端）");
+    // - Legacy TX：优先展示协议实际写出预览（非输入框原文）
+    const QByteArray wireTx = record.attributes.value(QStringLiteral("wireTxBytes")).toByteArray();
+    const bool wireBinary = record.attributes.value(QStringLiteral("wireTxBinary")).toBool();
+    const QString wireNote = record.attributes.value(QStringLiteral("wireTxNote")).toString();
+
+    if (legacyTx) {
+        if (!wireTx.isEmpty()) {
+            const bool asHex = preferHexSend() || wireBinary;
+            if (asHex) {
+                body += QStringLiteral(" | 发送 ") + QString::fromLatin1(wireTx.toHex(' '));
+            } else {
+                QString ascii = QString::fromLatin1(wireTx);
+                ascii.replace(QLatin1Char('\r'), QStringLiteral("\\r"));
+                ascii.replace(QLatin1Char('\n'), QStringLiteral("\\n"));
+                body += QStringLiteral(" | 发送 ") + ascii;
+            }
+            body += QStringLiteral("（%1 字节）").arg(wireTx.size());
+        } else if (!wireNote.isEmpty()) {
+            // 无法重建逐字节时，明确说明“无链路写出/不预览”，避免把入参当成发包
+            body += QStringLiteral(" | 发送 ") + wireNote;
+        } else if (!record.bytes.isEmpty()) {
+            body += QStringLiteral(" | 发送 ") + QString::fromUtf8(record.bytes);
+        }
     } else if (!record.bytes.isEmpty()) {
         const bool asHex =
             (record.direction == ca::Direction::Rx)   ? preferHexDisplay()
@@ -1546,7 +1541,7 @@ QString MainWindow::formatRecordForDisplay(const ca::CommRecord& record) const
                 body += QStringLiteral(" | HEX ") + QString::fromLatin1(record.bytes.toHex(' '));
         }
     }
-    if (legacyValue) {
+    if (legacyValue && record.direction == ca::Direction::Rx) {
         const QVariantList vals = record.attributes.value(QStringLiteral("values")).toList();
         if (!vals.isEmpty()) {
             QStringList parts;
@@ -1557,10 +1552,12 @@ QString MainWindow::formatRecordForDisplay(const ca::CommRecord& record) const
         const QString proto = record.attributes.value(QStringLiteral("protocolLabel")).toString();
         if (!proto.isEmpty())
             body += QStringLiteral(" | 协议 ") + proto;
-        if (record.direction == ca::Direction::Rx) {
-            const int legacyType = record.attributes.value(QStringLiteral("legacyType")).toInt();
-            body += QStringLiteral(" | 类型=%1").arg(legacyType);
-        }
+        const int legacyType = record.attributes.value(QStringLiteral("legacyType")).toInt();
+        body += QStringLiteral(" | 类型=%1").arg(legacyType);
+    } else if (legacyTx) {
+        const QString proto = record.attributes.value(QStringLiteral("protocolLabel")).toString();
+        if (!proto.isEmpty())
+            body += QStringLiteral(" | 协议 ") + proto;
     }
     if (record.kind == ca::RecordKind::LegacyControlEvent
         || record.kind == ca::RecordKind::LegacyParameterEvent) {

@@ -7,6 +7,7 @@
 #include "CaptureJson.h"
 #include "CaptureManager.h"
 #include "LegacyCapability.h"
+#include "LegacyWirePreview.h"
 #include "LegacySession.h"
 #include "LegacyWatchdog.h"
 #include "SendScheduler.h"
@@ -25,9 +26,12 @@
 #include <QTcpServer>
 #include <QTcpSocket>
 #include <QTimer>
+#include <QUdpSocket>
 #include <QVector>
+
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 static int g_failed = 0;
 
@@ -708,6 +712,197 @@ static void testSchedulerOnceAndCounted()
            "sched counted three submits");
 }
 
+static QByteArray hexSpaced(const char* spaced)
+{
+    return QByteArray::fromHex(QByteArray(spaced).replace(' ', QByteArray()));
+}
+
+static void testLegacyWirePreviewProtocols()
+{
+    // —— 串口 0 三思 ——
+    {
+        QVector<double> v;
+        v << 12321239.0;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Serial, 0, v, 8);
+        expect(w.bytes == QByteArrayLiteral("+1232123\r"), "ser0 large int wire");
+    }
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Serial, 0, v, 8);
+        // 对齐 DLL：45.6 经 float 编码后常见为 45.5999（手册 45.6000 为理想值）
+        expect(w.bytes.size() == 17 && w.bytes.startsWith('+') && w.bytes.endsWith('\r'),
+               "ser0 dual frame shape");
+        expect(w.bytes.left(8) == QByteArrayLiteral("+12.3000"), "ser0 first seg");
+        expect(w.bytes.mid(8, 8).startsWith('+'), "ser0 second seg sign");
+    }
+    // —— 串口 1 科新 ——
+    {
+        QVector<double> v;
+        v << 12.3;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Serial, 1, v, 8);
+        expect(w.bytes == hexSpaced("02 4C 30 30 30 31 32 2E 33 30 30 30 30 23"), "ser1 kexin 12.3");
+    }
+    // —— 串口 2 时代新材：无写出 ——
+    {
+        QVector<double> v;
+        v << 1.0;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Serial, 2, v, 8);
+        expect(w.bytes.isEmpty(), "ser2 no wire");
+    }
+    // —— 串口 3 IEEE：不重建字节，但须有说明 ——
+    {
+        QVector<double> v;
+        v << 1 << 2 << 3 << 4 << 5;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Serial, 3, v, 8);
+        expect(w.bytes.isEmpty(), "ser3 no rebuilt bytes");
+        expect(w.note.contains(QStringLiteral("56")), "ser3 note 56");
+    }
+    // —— 串口 4 冠腾（对齐 formatValue：宽 8 左补 0 → +012.3000）——
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Serial, 4, v, 8);
+        expect(w.bytes == QByteArrayLiteral("R+012.3000#N+045.6000#"), "ser4 guanteng dll format");
+    }
+    {
+        QVector<double> v;
+        v << 454254.0 << 34341314.0;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Serial, 4, v, 8);
+        expect(w.bytes == QByteArrayLiteral("R+454254.0000#N+34341314.0000#"),
+               "ser4 guanteng wide no truncate");
+    }
+    // —— 串口 5 联恒 ——
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Serial, 5, v, 8);
+        expect(w.bytes
+                   == hexSpaced(
+                       "AA 55 01 14 00 06 0C 9A 99 99 99 99 99 28 40 06 0D CD CC CC CC CC CC 46 40 02 67 0D 0A"),
+               "ser5 lhgk golden");
+    }
+    // —— 网口 0 JSON ——
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Network, 0, v, 8);
+        expect(w.bytes.contains("\"tn\":2"), "net0 tn2");
+        expect(w.bytes.contains("\"values\""), "net0 values");
+        expect(w.bytes.startsWith('{'), "net0 json object");
+    }
+    // —— 网口 1 万测 ——
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Network, 1, v, 8);
+        expect(w.bytes == QByteArrayLiteral("12.3,45.6"), "net1 csv text");
+    }
+    // —— 网口 2 中机 ——
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Network, 2, v, 8);
+        expect(w.bytes.size() == 17, "net2 size 17");
+        expect(static_cast<unsigned char>(w.bytes.at(0)) == 0x04, "net2 type");
+        double x = 0, y = 0;
+        std::memcpy(&x, w.bytes.constData() + 1, 8);
+        std::memcpy(&y, w.bytes.constData() + 9, 8);
+        expect(std::fabs(x - 12.3) < 1e-9 && std::fabs(y - 45.6) < 1e-9, "net2 doubles");
+    }
+    // —— 网口 3/4/5：无写出 ——
+    {
+        QVector<double> v;
+        v << 1.0 << 2.0;
+        expect(ca::previewLegacySendWire(ca::LegacyCommKind::Network, 3, v, 8).bytes.isEmpty(),
+               "net3 no wire");
+        expect(ca::previewLegacySendWire(ca::LegacyCommKind::Network, 4, v, 8).bytes.isEmpty(),
+               "net4 no wire");
+        expect(ca::previewLegacySendWire(ca::LegacyCommKind::Network, 5, v, 8).bytes.isEmpty(),
+               "net5 no wire");
+    }
+    // —— 网口 6 ——
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Network, 6, v, 8);
+        expect(w.bytes.contains("LVEComputedValues"), "net6 name");
+        expect(w.bytes.contains("\"values\""), "net6 values");
+    }
+    // —— 网口 7 ——
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6 << 1.0 << 2.0;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Network, 7, v, 8);
+        expect(w.bytes.contains("\"L1\""), "net7 L1");
+        expect(w.bytes.contains("\"hsm\""), "net7 hsm");
+    }
+    // —— 网口 8 联恒：AA55 头 + 0D0A 尾 ——
+    {
+        QVector<double> v;
+        v << 12.3 << 45.6;
+        const ca::LegacyWirePreview w =
+            ca::previewLegacySendWire(ca::LegacyCommKind::Network, 8, v, 8);
+        expect(w.bytes.size() >= 9, "net8 min size");
+        expect(static_cast<unsigned char>(w.bytes.at(0)) == 0xAA
+                   && static_cast<unsigned char>(w.bytes.at(1)) == 0x55,
+               "net8 header");
+        expect(w.bytes.size() >= 2
+                   && static_cast<unsigned char>(w.bytes.at(w.bytes.size() - 2)) == 0x0D
+                   && static_cast<unsigned char>(w.bytes.at(w.bytes.size() - 1)) == 0x0A,
+               "net8 tail");
+    }
+    // —— 全部协议边界文案：非空、含示例、无实现对内措辞 ——
+    struct BoundCase {
+        ca::LegacyCommKind kind;
+        int idx;
+        const char* tag;
+    };
+    const BoundCase cases[] = {
+        {ca::LegacyCommKind::Serial, 0, "bound ser0"},
+        {ca::LegacyCommKind::Serial, 1, "bound ser1"},
+        {ca::LegacyCommKind::Serial, 2, "bound ser2"},
+        {ca::LegacyCommKind::Serial, 3, "bound ser3"},
+        {ca::LegacyCommKind::Serial, 4, "bound ser4"},
+        {ca::LegacyCommKind::Serial, 5, "bound ser5"},
+        {ca::LegacyCommKind::Network, 0, "bound net0"},
+        {ca::LegacyCommKind::Network, 1, "bound net1"},
+        {ca::LegacyCommKind::Network, 2, "bound net2"},
+        {ca::LegacyCommKind::Network, 3, "bound net3"},
+        {ca::LegacyCommKind::Network, 4, "bound net4"},
+        {ca::LegacyCommKind::Network, 5, "bound net5"},
+        {ca::LegacyCommKind::Network, 6, "bound net6"},
+        {ca::LegacyCommKind::Network, 7, "bound net7"},
+        {ca::LegacyCommKind::Network, 8, "bound net8"},
+    };
+    for (const BoundCase& c : cases) {
+        const QStringList tips = ca::legacyDataBoundaryTips(c.kind, c.idx, 8);
+        expect(!tips.isEmpty(), c.tag);
+        const QString joined = tips.join(QLatin1Char('|'));
+        expect(joined.contains(QStringLiteral("示例")), c.tag);
+        expect(!joined.contains(QStringLiteral("动态库")), c.tag);
+        expect(!joined.contains(QStringLiteral("formatValue")), c.tag);
+    }
+    // 冠腾示例须可直接对照写出
+    {
+        const QString joined = ca::legacyDataBoundaryTips(ca::LegacyCommKind::Serial, 4, 8).join(QLatin1Char('|'));
+        expect(joined.contains(QStringLiteral("R+012.3000#N+045.6000#")), "bound ser4 guanteng sample");
+    }
+}
+
 static void testWaveformGeneratorAndSched()
 {
     ca::WaveformGenerator gen;
@@ -1353,6 +1548,7 @@ int main(int argc, char* argv[])
     testUdpBindConflictAndTcpCoexist();
     testUdpSendWithoutRemote();
     testSchedulerOnceAndCounted();
+    testLegacyWirePreviewProtocols();
     testWaveformGeneratorAndSched();
     testSchedulerRoundRobinAndPause();
     testSchedulerFailedStopsAndSubmittedAnchor();

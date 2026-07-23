@@ -140,6 +140,7 @@ exit /B 0
     <ClCompile Include="capture\CaptureWriter.cpp" />
     <ClCompile Include="capture\CaptureManager.cpp" />
     <ClCompile Include="legacy\LegacyCapability.cpp" />
+    <ClCompile Include="legacy\LegacyWirePreview.cpp" />
     <ClCompile Include="legacy\ILegacyBackend.cpp" />
     <ClCompile Include="legacy\LegacyWorker.cpp" />
     <ClCompile Include="legacy\LegacyWatchdog.cpp" />
@@ -166,6 +167,7 @@ exit /B 0
     <QtMoc Include="legacy\LegacyWatchdog.h" />
     <QtMoc Include="legacy\LegacySession.h" />
     <ClInclude Include="legacy\LegacyCapability.h" />
+    <ClInclude Include="legacy\LegacyWirePreview.h" />
     <ClInclude Include="core\Types.h" />
     <ClInclude Include="core\Result.h" />
     <ClInclude Include="core\ResourceClaim.h" />

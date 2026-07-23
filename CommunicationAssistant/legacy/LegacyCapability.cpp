@@ -46,8 +46,8 @@ static void put(LegacyCapabilityProfile* p, LegacyCapability c, bool s, const QS
 
 static void setRawAlwaysOff(LegacyCapabilityProfile* p)
 {
-    put(p, LegacyCapability::RawReceive, false, QStringLiteral("兼容动态库不支持原始抓包"));
-    put(p, LegacyCapability::RawSend, false, QStringLiteral("兼容动态库不支持原始发送"));
+    put(p, LegacyCapability::RawReceive, false, QStringLiteral("不支持原始抓包"));
+    put(p, LegacyCapability::RawSend, false, QStringLiteral("不支持原始发送"));
     put(p, LegacyCapability::RequiresPollingPermission, false);
     put(p, LegacyCapability::RequiresStreamingState, false);
 }
@@ -88,27 +88,27 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
             put(&p, LegacyCapability::ReceiveParameterEvents, false);
             // 对齐 SocketComm::SendData：无 case 3，数值发送不会写出线帧（库逻辑不动，助手边界拒绝）
             put(&p, LegacyCapability::SendEncodedValues, false, QString(),
-                QStringLiteral("不能发：动态库网口三思无 SendData(vector) 编码分支，助手不会写出线帧"));
+                QStringLiteral("本协议不支持数值发送"));
             put(&p, LegacyCapability::SendTransparentText, false, QString(),
-                QStringLiteral("不能发：网口三思无透明文本写出路径"));
+                QStringLiteral("本协议不支持透明文本发送"));
             break;
         case 4:
             put(&p, LegacyCapability::ReceiveValues, false);
             put(&p, LegacyCapability::ReceiveControlEvents, true);
             put(&p, LegacyCapability::ReceiveParameterEvents, true);
             put(&p, LegacyCapability::SendEncodedValues, false, QString(),
-                QStringLiteral("不能发：触发存图协议无数值发送分支（仅控制/参数事件）"));
+                QStringLiteral("本协议仅支持控制/参数事件，不支持数值发送"));
             put(&p, LegacyCapability::SendTransparentText, false, QString(),
-                QStringLiteral("不能发：触发存图透明文本未经验证"));
+                QStringLiteral("本协议不支持透明文本发送"));
             break;
         case 5:
             put(&p, LegacyCapability::ReceiveValues, true);
             put(&p, LegacyCapability::ReceiveControlEvents, false);
             put(&p, LegacyCapability::ReceiveParameterEvents, false);
             put(&p, LegacyCapability::SendEncodedValues, false, QString(),
-                QStringLiteral("不能发：福建威盛无数值发送分支（仅接收解析）"));
+                QStringLiteral("本协议仅支持接收解析，不支持数值发送"));
             put(&p, LegacyCapability::SendTransparentText, false, QString(),
-                QStringLiteral("不能发：福建威盛透明文本未经验证"));
+                QStringLiteral("本协议不支持透明文本发送"));
             break;
         case 6:
             put(&p, LegacyCapability::ReceiveValues, false);
@@ -124,7 +124,7 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
             put(&p, LegacyCapability::ReceiveParameterEvents, true);
             // 对齐 SocketComm::GenJsonDocument：要求恰好 4 个 double
             put(&p, LegacyCapability::SendEncodedValues, true, QString(),
-                QStringLiteral("恰好 4 个数值（L1,b1,Le1,bo1）；收侧不回显数值通道"));
+                QStringLiteral("入参须恰好 4 个数值（L1,b1,Le1,bo1）"));
             put(&p, LegacyCapability::SendTransparentText, true);
             break;
         case 8:
@@ -132,8 +132,9 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
             put(&p, LegacyCapability::ReceiveValues, true);
             put(&p, LegacyCapability::ReceiveControlEvents, true);
             put(&p, LegacyCapability::ReceiveParameterEvents, false);
-            put(&p, LegacyCapability::SendEncodedValues, true, QString(), QStringLiteral("至少 2 个数值（力、温）"));
-            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("联恒不支持透明文本"));
+            put(&p, LegacyCapability::SendEncodedValues, true, QString(),
+                QStringLiteral("入参须至少 2 个数值（力、温度）"));
+            put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("不支持透明文本发送"));
             put(&p, LegacyCapability::RequiresPollingPermission, true);
             put(&p, LegacyCapability::RequiresStreamingState, true);
             break;
@@ -150,11 +151,13 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
 
     switch (protocolIndex) {
     case 0:
-        put(&p, LegacyCapability::ReceiveValues, true);
+        put(&p, LegacyCapability::ReceiveValues, true, QString(),
+            QStringLiteral("拼至 0D 的定宽 ASCII 段"));
         put(&p, LegacyCapability::ReceiveControlEvents, true);
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
-        put(&p, LegacyCapability::SendEncodedValues, true);
-        put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("SendData(QString) 空实现"));
+        put(&p, LegacyCapability::SendEncodedValues, true, QString(),
+            QStringLiteral("每路定宽=数据位(常用8) ASCII，末尾 0D；数值经 float 编码"));
+        put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("不支持透明文本发送"));
         break;
     case 1:
         // 收：仅力值 1 路；发：仅编码 vData[0]；控制字 {QLI[1]}/{QLI[2]} 上报开始/停止
@@ -172,25 +175,27 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
         put(&p, LegacyCapability::ReceiveValues, true, QString(),
             QStringLiteral("收 1 路（CSV 第 1 段）；第 2 段为设备序号非测量通道"));
         put(&p, LegacyCapability::ReceiveControlEvents, false,
-            QStringLiteral("时代新材库无独立控制事件分支"));
+            QStringLiteral("本协议无独立控制事件"));
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
         put(&p, LegacyCapability::SendEncodedValues, false, QString(),
-            QStringLiteral("不能发：动态库串口时代新材无数值发送编码分支"));
+            QStringLiteral("本协议不支持数值发送"));
         put(&p, LegacyCapability::SendTransparentText, false, QString(),
-            QStringLiteral("不能发：SendData(QString) 为空实现"));
+            QStringLiteral("本协议不支持透明文本发送"));
         break;
     case 3:
         put(&p, LegacyCapability::ReceiveValues, false);
         put(&p, LegacyCapability::ReceiveControlEvents, true);
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
-        put(&p, LegacyCapability::SendEncodedValues, true, QString(), QStringLiteral("至少 5 个数值"));
+        put(&p, LegacyCapability::SendEncodedValues, true, QString(),
+            QStringLiteral("入参须至少 5 个数值"));
         put(&p, LegacyCapability::SendTransparentText, false);
         break;
     case 4:
         put(&p, LegacyCapability::ReceiveValues, false);
         put(&p, LegacyCapability::ReceiveControlEvents, false);
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
-        put(&p, LegacyCapability::SendEncodedValues, true, QString(), QStringLiteral("至少 2 个数值"));
+        put(&p, LegacyCapability::SendEncodedValues, true, QString(),
+            QStringLiteral("入参须至少 2 个数值（依次对应 R、N）"));
         put(&p, LegacyCapability::SendTransparentText, false);
         break;
     case 5:
@@ -198,8 +203,9 @@ LegacyCapabilityProfile legacyCapabilityFor(LegacyCommKind kind, int protocolInd
         put(&p, LegacyCapability::ReceiveValues, true);
         put(&p, LegacyCapability::ReceiveControlEvents, true);
         put(&p, LegacyCapability::ReceiveParameterEvents, false);
-        put(&p, LegacyCapability::SendEncodedValues, true, QString(), QStringLiteral("至少 2 个数值（力、温）"));
-        put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("SendData(QString) 空实现"));
+        put(&p, LegacyCapability::SendEncodedValues, true, QString(),
+            QStringLiteral("入参须至少 2 个数值（力、温度）"));
+        put(&p, LegacyCapability::SendTransparentText, false, QStringLiteral("不支持透明文本发送"));
         put(&p, LegacyCapability::RequiresPollingPermission, true);
         put(&p, LegacyCapability::RequiresStreamingState, true);
         break;

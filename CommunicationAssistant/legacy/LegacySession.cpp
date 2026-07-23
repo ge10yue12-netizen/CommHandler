@@ -1,5 +1,7 @@
 #include "LegacySession.h"
 
+#include "LegacyWirePreview.h"
+#include "Types.h"
 #include "ClaimFor.h"
 #include "UIDef.h"
 
@@ -642,6 +644,28 @@ void LegacySession::emitTxRecord(const SendRequest& request, RecordStatus status
     rec.errorCode = code;
     rec.errorMessage = message;
     rec.summary = QStringLiteral("Legacy 发送（%1）").arg(recordStatusDisplayName(status));
+
+    // 数据显示用：预估实际写出线帧（DLL 不回传已发送原始字节）
+    QVector<double> values;
+    const QVariantList list = request.attributes.value(QStringLiteral("values")).toList();
+    values.reserve(list.size());
+    for (const QVariant& v : list)
+        values.push_back(v.toDouble());
+    const QString mode = request.attributes.value(QStringLiteral("legacySend")).toString();
+    const QString text =
+        (mode == QStringLiteral("text")) ? QString::fromUtf8(request.payload) : QString();
+    const LegacyCommKind kind =
+        (config_.transport.legacy.commType == 1) ? LegacyCommKind::Serial : LegacyCommKind::Network;
+    const LegacyWirePreview wire =
+        previewLegacySendWire(kind, config_.transport.legacy.protocolIndex, values,
+                              config_.transport.legacy.dataBits, text);
+    if (!wire.bytes.isEmpty()) {
+        rec.attributes.insert(QStringLiteral("wireTxBytes"), wire.bytes);
+        rec.attributes.insert(QStringLiteral("wireTxBinary"), wire.binary);
+    }
+    if (!wire.note.isEmpty())
+        rec.attributes.insert(QStringLiteral("wireTxNote"), wire.note);
+
     emit recordReceived(rec);
 }
 

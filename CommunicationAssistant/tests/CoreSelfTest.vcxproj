@@ -72,6 +72,7 @@ exit /B 0
     <ClCompile Include="..\capture\CaptureWriter.cpp" />
     <ClCompile Include="..\capture\CaptureManager.cpp" />
     <ClCompile Include="..\legacy\LegacyCapability.cpp" />
+    <ClCompile Include="..\legacy\LegacyWirePreview.cpp" />
     <ClCompile Include="..\legacy\ILegacyBackend.cpp" />
     <ClCompile Include="..\legacy\LegacyWorker.cpp" />
     <ClCompile Include="..\legacy\LegacyWatchdog.cpp" />
